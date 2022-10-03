@@ -18,6 +18,7 @@ from binascii import hexlify, unhexlify
 
 from .appbase import AppBase
 from .constants import DATETIME_FORMAT
+from .exceptions import IntRangeException
 
 class Waggle:
     def __init__(self, username, wifs=None):
@@ -55,7 +56,7 @@ class Waggle:
         ref_block_prefix = struct.unpack_from("<I", unhexlify(previous), 4)[0]
         return ref_block_num, ref_block_prefix
 
-    def vote(self, author, permlink, weight, expire=30, synchronous=True, truncated=True):
+    def vote(self, author, permlink, weight, expire=30, synchronous=True, truncated=True, strict=True):
 
         pattern = r"[\w][\w\d]+[\.]{0,1}[\w\d]+"
         match = re.findall(pattern, author)
@@ -67,7 +68,7 @@ class Waggle:
         if not len(match):
             raise
         
-        weight = within_range(weight, 1, 10000)
+        weight = within_range(weight, -10000, 10000)
         expire = within_range(expire, 5, 120)
         synchronous = true_or_false(synchronous, True)
         truncated = true_or_false(truncated, True)
@@ -81,14 +82,16 @@ class Waggle:
                      "expiration": expiration,
                      "operations": operations,
                      "extensions": [] }
-        return self._broadcast(transaction, synchronous, truncated)
+        return self._broadcast(transaction, synchronous, truncated, strict)
     
-    def _broadcast(self, transaction, synchronous=True, truncated=True):
+    def _broadcast(self, transaction, synchronous=True, truncated=True, strict=True):
         method = "condenser_api.broadcast_transaction"
         if synchronous:
             method = "condenser_api.broadcast_transaction_synchronous"
-            return self.appbase.broadcast(method, transaction, truncated)
-        return self.appbase.broadcast(method, transaction, truncated)
+            result = self.appbase.broadcast(method, transaction, truncated, strict)
+            if result:
+                return result
+        return self.appbase.broadcast(method, transaction, truncated, strict)
 
 def _make_expiration(secs=30):
     timestamp = time.time() + int(secs)
@@ -96,9 +99,9 @@ def _make_expiration(secs=30):
 
 def within_range(value, minimum, maximum):
     if not isinstance(value, int):
-        raise IntRangeException(f"Integer value must be within f{minimum} to f{maximum} only.")
+        raise IntRangeException(f"Integer value must be within {minimum} to {maximum} only.")
     if not (1 <= value <= 10000):
-        raise IntRangeException(f"Integer value must be within f{minimum} to f{maximum} only.")
+        raise IntRangeException(f"Integer value must be within {minimum} to {maximum} only.")
     return value
 
 def true_or_false(value, fallback):

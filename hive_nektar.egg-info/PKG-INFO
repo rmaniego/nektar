@@ -1,0 +1,57 @@
+Metadata-Version: 2.1
+Name: hive-nektar
+Version: 0.0.9
+Summary: Nektar, a Python package to access Hive API.
+Home-page: https://github.com/rmaniego/nektar
+Author: Rodney Maniego Jr.
+Author-email: rodney.maniegojr@gmail.com
+License: MIT
+Download-URL: https://github.com/rmaniego/nektar/archive/v1.0.tar.gz
+Keywords: nektar,hive,blockchain,api
+Platform: UNKNOWN
+Classifier: Development Status :: 5 - Production/Stable
+Classifier: Intended Audience :: Developers
+Classifier: Topic :: Software Development :: Build Tools
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+License-File: LICENSE
+
+![](/resources/banner.png)
+
+# nektar
+nektar allows communication to the Hive blockchain using the Hive API.
+
+## Official Release
+**nektar** can now be used on your Python projects through PyPi by running pip command on a Python-ready environment.
+
+`pip install nektar --upgrade`
+
+Current version is 0.0.9, but more updates are coming soon.
+
+This is compatible with Python 3.9 or later.
+
+## Use-cases
+**1.** !!! 
+**2.** !!! 
+**3.** !!!
+
+## Usage
+**1. Import Package**
+```python
+from nektar import Waggle
+
+username = ""
+wif = ""
+
+dapp = Waggle(username)
+dapp.append_wif(wif)
+
+author = ""
+permlink = ""
+weight = 10000
+
+dapp.vote(author, permlink, weight)
+```
+

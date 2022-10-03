@@ -6,17 +6,14 @@
     This module contains all Hive blockchain and Nektar constants.
     Do not change to avoid unecessary breakage.
     
-    Review the official Hive codebase and API documentation
+    Review the official Hive codebase and the API documentation
     before any modifications.
 
     :copyright: 2022 Rodney Maniego Jr.
     :license: MIT License
 """
 
-NEKTAR_VERSION = "0.0.9"
-
-# Starting HF24 v0.24.0
-HIVE_CHAIN_ID = "beeab0de00000000000000000000000000000000000000000000000000000000"
+NEKTAR_VERSION = "0.1.0"
 
 # PublicKey prefix
 PREFIX = "STM" 
@@ -33,12 +30,9 @@ APPBASE_API = {
         "broadcast_transaction_synchronous",
         "find_proposals",
         "find_recurrent_transfers",
-        "get_account_bandwidth",
         "get_account_count",
         "get_account_history",
-        "get_account_references",
         "get_account_reputations",
-        "get_account_votes",
         "get_accounts",
         "get_active_votes",
         "get_active_witnesses",
@@ -117,7 +111,6 @@ APPBASE_API = {
         "lookup_account_names",
         "lookup_accounts",
         "lookup_witness_accounts",
-        "verify_account_authority",
         "verify_authority",
     ],
     "account_by_key_api": ["get_key_references"],
@@ -201,7 +194,6 @@ APPBASE_API = {
         "list_withdraw_vesting_routes",
         "list_witness_votes",
         "list_witnesses",
-        "verify_account_authority",
         "verify_authority",
         "verify_signatures",
     ],
@@ -341,6 +333,3 @@ NODES = [   "api.hive.blog",
             "api.c0ff33a.uk",
             "hive-api.arcange.eu",
             "api.pharesim.me" ]
-
-# https://github.com/tochev/python3-cryptocoins/raw/master/cryptocoins/base58.py
-BASE58_ALPHABET = b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"

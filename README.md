@@ -6,16 +6,16 @@ nektar allows communication to the Hive blockchain using the Hive API.
 ## Official Release
 **nektar** can now be used on your Python projects through PyPi by running pip command on a Python-ready environment.
 
-`pip install nektar --upgrade`
+`pip install hive-nektar --upgrade`
 
 Current version is 0.0.9, but more updates are coming soon.
 
 This is compatible with Python 3.9 or later.
 
 ## Use-cases
-**1.** !!! 
-**2.** !!! 
-**3.** !!!
+**1.** !!! <br>
+**2.** !!! <br>
+**3.** !!! <br>
 
 ## Usage
 **1. Import Package**

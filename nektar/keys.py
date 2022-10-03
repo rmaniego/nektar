@@ -38,13 +38,13 @@ class Address(object):
         """ Derive address using ``RIPEMD160(SHA256(x))`` """
         pkbin = unhexlify(repr(self._pubkey))
         addressbin = ripemd160(hexlify(hashlib.sha256(pkbin).digest()))
-        return Base58(hexlify(addressbin).decode('ascii'))
+        return Base58(hexlify(addressbin).decode("ascii"))
 
     def derivesha512address(self):
         """ Derive address using ``RIPEMD160(SHA512(x))`` """
         pkbin = unhexlify(repr(self._pubkey))
         addressbin = ripemd160(hexlify(hashlib.sha512(pkbin).digest()))
-        return Base58(hexlify(addressbin).decode('ascii'))
+        return Base58(hexlify(addressbin).decode("ascii"))
 
     def __repr__(self):
         """ Gives the hex representation of the ``GrapheneBase58CheckEncoded``
@@ -89,8 +89,6 @@ class PublicKey(object):
     def _derive_y_from_x(self, x, is_even):
         """ Derive y point from x point """
         curve = ecdsa.SECP256k1.curve
-        # The curve equation over F_p is:
-        #   y^2 = x^3 + ax + b
         a, b, p = curve.a(), curve.b(), curve.p()
         alpha = (pow(x, 3, p) + a * x + b) % p
         beta = ecdsa.numbertheory.square_root_mod_prime(alpha, p)
@@ -101,13 +99,10 @@ class PublicKey(object):
     def compressed(self):
         """ Derive compressed public key """
         order = ecdsa.SECP256k1.generator.order()
-        p = ecdsa.VerifyingKey.from_string(
-            as_bytes(self), curve=ecdsa.SECP256k1).pubkey.point
+        p = ecdsa.VerifyingKey.from_string(as_bytes(self), curve=ecdsa.SECP256k1).pubkey.point
         x_str = ecdsa.util.number_to_string(p.x(), order)
-        # y_str = ecdsa.util.number_to_string(p.y(), order)
         compressed = hexlify(
-            as_bytes(chr(2 + (p.y() & 1)), 'ascii') + x_str).decode(
-            'ascii')
+            as_bytes(chr(2 + (p.y() & 1)), "ascii") + x_str).decode("ascii")
         return (compressed)
 
     def unCompressed(self):
@@ -119,7 +114,7 @@ class PublicKey(object):
         assert prefix == "02" or prefix == "03"
         x = int(public_key[2:], 16)
         y = self._derive_y_from_x(x, (prefix == "02"))
-        key = '04' + '%064x' % x + '%064x' % y
+        key = "04" + "%064x" % x + "%064x" % y
         return key
 
     def point(self):
@@ -152,19 +147,18 @@ class PrivateKey(object):
     def __init__(self, wif=None, prefix="STM"):
         if wif is None:
             import os
-            self._wif = Base58(hexlify(os.urandom(32)).decode('ascii'))
+            self._wif = Base58(hexlify(os.urandom(32)).decode("ascii"))
         elif isinstance(wif, Base58):
             self._wif = wif
         else:
             self._wif = Base58(wif)
-        # compress pubkeys only
-        self._pubkeyhex, self._pubkeyuncompressedhex = self.compressedpubkey()
-        self.pubkey = PublicKey(self._pubkeyhex, prefix=prefix)
-        self.uncompressed = PublicKey(
-            self._pubkeyuncompressedhex, prefix=prefix)
-        self.uncompressed.address = Address(
-            pubkey=self._pubkeyuncompressedhex, prefix=prefix)
-        self.address = Address(pubkey=self._pubkeyhex, prefix=prefix)
+
+        self.pubkeyhex, self.pubkeyuncompressedhex = self.compressedpubkey()
+        self.pubkey = PublicKey(self.pubkeyhex, prefix=prefix)
+        self.uncompressed = PublicKey(self.pubkeyuncompressedhex, prefix=prefix)
+        
+        self.uncompressed.address = Address(pubkey=self.pubkeyuncompressedhex, prefix=prefix)
+        self.address = Address(pubkey=self.pubkeyhex, prefix=prefix)
 
     def compressedpubkey(self):
         """ Derive uncompressed public key """
@@ -176,11 +170,11 @@ class PrivateKey(object):
         x_str = ecdsa.util.number_to_string(p.x(), order)
         y_str = ecdsa.util.number_to_string(p.y(), order)
         compressed = hexlify(
-            chr(2 + (p.y() & 1)).encode('ascii') + x_str
-        ).decode('ascii')
+            chr(2 + (p.y() & 1)).encode("ascii") + x_str
+        ).decode("ascii")
         uncompressed = hexlify(
-            chr(4).encode('ascii') + x_str + y_str).decode(
-            'ascii')
+            chr(4).encode("ascii") + x_str + y_str).decode(
+            "ascii")
         return [compressed, uncompressed]
 
     def __format__(self, _format):
@@ -219,9 +213,9 @@ class PasswordKey(object):
         """
             Derive private key from the brain key and the current sequence number
         """
-        a = as_bytes(self.account + self.role + self.password, 'utf8')
+        a = as_bytes(self.account + self.role + self.password, "utf8")
         s = hashlib.sha256(a).digest()
-        return PrivateKey(hexlify(s).decode('ascii'))
+        return PrivateKey(hexlify(s).decode("ascii"))
 
     def get_public(self):
         return self.get_private().pubkey

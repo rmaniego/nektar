@@ -1,10 +1,8 @@
 import string
 import hashlib
 from binascii import hexlify, unhexlify
-from .constants import HIVE_CHAIN_ID
+from .constants import PREFIX
 
-""" Default Prefix """
-PREFIX = "STM"
 known_prefixes = [PREFIX]
 
 
@@ -124,9 +122,9 @@ def base58decode(base58_str):
 
 
 def base58encode(hexstring):
-    byteseq = as_bytes(hexstring, "ascii")
+    byteseq = compat_bytes(hexstring, "ascii")
     byteseq = unhexlify(byteseq)
-    byteseq = as_bytes(byteseq)
+    byteseq = compat_bytes(byteseq)
 
     n = 0
     leading_zeroes_count = 0

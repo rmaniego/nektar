@@ -10,11 +10,14 @@
 """
 
 import json
+import hashlib
 import requests
+from collections import OrderedDict
+from binascii import hexlify, unhexlify
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 
-from .transactions import sign_transaction
+from .transactions import sign_transaction, as_bytes
 from .constants import NEKTAR_VERSION, NODES, APPBASE_API, BLOCKCHAIN_OPERATIONS
 from .exceptions import RPCNodeException, NodeException, APIException, APIMethodException
 
@@ -22,7 +25,7 @@ class AppBase:
     def __init__(self,
                     nodes=None,
                     api=None,
-                    timeout=60,
+                    timeout=10,
                     retries=3):
 
         # set default to condenser api
@@ -35,19 +38,21 @@ class AppBase:
         self.set_retries(retries)
 
         # set session timeout
-        self.timeout = 60
+        self.timeout = 10
         self.set_timeout(timeout)
         
         # initialize session
         self.session = requests.Session()
         max_retries = Retry(total=self.retries, backoff_factor=0.5, status_forcelist=[502, 503, 504])
-        self.session.mount("https://", HTTPAdapter(max_retries=max_retries))
+        self.session.mount("http://", HTTPAdapter(max_retries=max_retries))
         self.headers = { "User-Agent": f"Nektar v{NEKTAR_VERSION}", "content-type": "application/json; charset=utf-8" }
         
         self.nodes = NODES
         self.custom_nodes(nodes)
         
         self.wifs = []
+        self.chain_id = self.api("database").get_version({})["chain_id"]
+        self._transaction_id = None
         
     
     def custom_nodes(self, nodes):
@@ -122,16 +127,29 @@ class AppBase:
         if "truncated" in kwargs:
             truncated = kwargs["truncated"]
         
+        # raise exception on error or not
+        strict = True
+        if "strict" in kwargs:
+            strict = kwargs["strict"]
+        
         broadcast_methods = [
             "condenser_api.broadcast_transaction",
-            "condenser_api.broadcast_transaction_synchronous"
+            "condenser_api.broadcast_transaction_synchronous",
+            "database_api.get_potential_signatures",
+            "database_api.get_required_signatures",
+            "database_api.get_transaction_hex",
+            "database_api.verify_authority",
+            "network_broadcast_api.broadcast_transaction"
         ]
+        
+        if params in broadcast_methods:
+            params = [params]
+            if method in broadcast_methods[2:]:
+                params = { "trx": params[0] }
         
         if method in broadcast_methods:
             return broadcast(method, params, truncated)
-        
-        temp = self.request(method, params, truncated)
-        return temp
+        return self.request(method, params, truncated)
 
     def request(self, method, params, truncated):
         """
@@ -142,38 +160,40 @@ class AppBase:
         return self._send_request(payload, truncated)
         
 
-    def broadcast(self, method, transaction, truncated):
+    def broadcast(self, method, transaction, truncated, strict=True):
         ## check if operations are valid
         for operation in transaction["operations"]:
             if operation[0] not in BLOCKCHAIN_OPERATIONS:
                 raise OperationException(operation[0] + " is unsupported")
-
-        # transaction["signatures"] = []
-        # if "signatures" in transaction:
-        #    transaction.pop("signatures", None)
+        
+        if "signatures" in transaction:
+            transaction.pop("transaction", None)
 
         ## serialize transaction and sign with private keys
         serialized_transaction = self._serialize(transaction)
-        transaction["signatures"] = sign_transaction(serialized_transaction, self.wifs)
+        
+        ## generate transaction id
+        hashed = hashlib.sha256(unhexlify(serialized_transaction)).digest()
+        self._transaction_id = hexlify(hashed[:20]).decode("ascii")
+        
+        ## update transaction signature
+        transaction["signatures"] = sign_transaction(self.chain_id, serialized_transaction, self.wifs)
         
         self.rid += 1
         params = [transaction]
         payload = _format_payload(method, params, self.rid)
-        print(payload)
-        return self._send_request(payload, truncated)
+        result = self._send_request(payload, truncated, strict)
+        if method == "condenser_api.broadcast_transaction" and not strict:
+            return self.api("condenser_api").get_transaction([transaction_id])
+        return result
 
     def _serialize(self, transaction):
         """
             Get a hexdump of the serialized binary form of a transaction.
         """
-        
-        self.rid += 1
-        params = [transaction]
-        method = "condenser_api.get_transaction_hex"
-        payload = _format_payload(method, params, self.rid)
-        return self._send_request(payload)
+        return self.api("condenser").get_transaction_hex([transaction])
 
-    def _send_request(self, payload, truncated=True):
+    def _send_request(self, payload, truncated=True, strict=True):
         response = None
         for node in self.nodes:
             try:
@@ -184,7 +204,7 @@ class AppBase:
                                         timeout=self.timeout)
                 break
             except:
-                print(f"\nNode API '{node}' is offline, trying the next node....")
+                pass
         if response is None:
             return {}
         response.raise_for_status()
@@ -194,8 +214,8 @@ class AppBase:
         if "result" in response:
             return response["result"]
         if "error" in response:
-            print(response)
-            # raise RPCNodeException(response["error"].get("message"), code=response["error"].get("code"), raw_body=response)
+            if strict:
+                raise RPCNodeException(response["error"].get("message"), code=response["error"].get("code"), raw_body=response)
         return {}
 
 def _format_payload(method, params, rid):
