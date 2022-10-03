@@ -36,8 +36,7 @@ class Waggle:
         self.username = username.replace("@", "")
 
     def refresh(self):
-        params = [[self.username]]
-        self.account = self.appbase.api("condenser").get_accounts(params)
+        self.account = self.appbase.api("condenser").get_accounts([[self.username]])
 
     def get_dynamic_global_properties(self, api="condenser"):
         ## use database_api
