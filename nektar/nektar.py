@@ -174,12 +174,13 @@ class Waggle:
                 break
         return results[:custom_limit]
 
-    def posts(self, community=None, sort="created", limit=100):
+    def posts(self, community=None, sort="created", paidout=None, limit=100):
         """
             Get ranked posts.
             
             :tag: community name `hive-*` (optional)
             :sort: sort by `trending`, `hot`, `promoted`, `payout`, `payout_comments`, `muted`
+            :paidout: return new (False), paidout (True), all (None)
             :limit: maximum limit of blogs
         """
 
@@ -195,9 +196,18 @@ class Waggle:
         params["observer"] = self.username
 
         # custom limits by nektar, hive api limit: 100?
-        custom_limit = within_range(limit, 1, 100, 100)
+        limit = within_range(limit, 1, 1000, 100)
+        params["limit"] = limit
 
-        return self.appbase.api("bridge").get_ranked_posts(params)[:custom_limit]
+        results = []
+        filter = [True, False]
+        if isinstance(paidout, bool):
+            filter = [paidout]
+        result = self.appbase.api("bridge").get_ranked_posts(params)
+        for post in result:
+            if post["is_paidout"] in filter:
+                results.append(post)
+        return results
 
     def vote(self, author, permlink, weight, expire=30, synchronous=False, truncated=True, strict=True):
         """
