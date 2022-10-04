@@ -7,7 +7,7 @@ Lightweight and highly customizable communication with the Hive APIs
 
 """
 
-__version__ = "0.9.3"
+__version__ = "0.9.4"
 from .nektar import Waggle
 from .appbase import AppBase
 __all__ = ["nektar", "appbase"]

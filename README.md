@@ -48,6 +48,8 @@ for subscriber in hive.subscribers(community, limit=1000):
     subscribers.update({subscriber[0]: subscriber})
     print(subscriber[0])
 
+accounts = hive.accounts(start="h", limit=1000)
+
 author = ""
 permlink = ""
 weight = 10000

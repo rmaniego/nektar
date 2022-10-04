@@ -59,7 +59,7 @@ class Waggle:
         """
             List all communities.
             
-            :last: last known community name `hive-*` (optional)
+            :last: last known community name `hive-*`, paging mechanism (optional)
             :limit: maximum limit of communities to list.
             :sorting: sort by `rank`, `new`, or `subs`
             :query: additional filter keywords for search
@@ -73,7 +73,8 @@ class Waggle:
         if isinstance(last, str):
             params["query"] = query
         
-        custom_limit = within_range(limit, 1, 1000000, 100)
+        # custom limits by nektar, hive api limit: 100
+        custom_limit = within_range(limit, 1, 10000, 100)
         crawls = custom_limit // 100
         params["limit"] = custom_limit
         if crawls > 0:
@@ -84,22 +85,24 @@ class Waggle:
             if len(match):
                 params["last"] = last
 
-        communities = []
+        results = []
         for _ in range(crawls):
             result = self.appbase.api("bridge").list_communities(params)
             if len(result) < 100:
                 break
-            communities.extend(result)
-            params["last"] = communities[-1]["name"]
-        return communities[0:custom_limit]
+            results.extend(result)
+            if len(results) >= custom_limit:
+                break
+            params["last"] = results[-1]["name"]
+        return results[:custom_limit]
 
     def subscribers(self, community, last=None, limit=100):
         """
             Gets a list of subscribers for a given community.
             
             :community: community name `hive-*`
-            :last: last known subscriber username (optional)
-            :limit: maximum limit of communities to list.
+            :last: last known subscriber username, paging mechanism (optional)
+            :limit: maximum limit of subscribers to list.
         """
 
         params = {}
@@ -110,7 +113,8 @@ class Waggle:
             if not len(match):
                 raise NektarException(f"Community name '{community}' format is unsupported.")
         
-        custom_limit = within_range(limit, 1, 1000000, 100)
+        # custom limits by nektar, hive api limit: 100
+        custom_limit = within_range(limit, 1, 10000, 100)
         crawls = custom_limit // 100
         params["limit"] = custom_limit
         if crawls > 0:
@@ -121,29 +125,74 @@ class Waggle:
             if len(match):
                 params["last"] = last
 
-        subscribers = []
+        results = []
         for _ in range(crawls):
             result = self.appbase.api("bridge").list_subscribers(params)
             if len(result) < 100:
                 break
-            subscribers.extend(result)
-            params["last"] = subscribers[-1][0]
-        return subscribers[0:custom_limit]
+            results.extend(result)
+            if len(results) >= custom_limit:
+                break
+            params["last"] = results[-1][0]
+        return results[:custom_limit]
+
+    def accounts(self, start=None, limit=100):
+        """
+            Looks up accounts starting with name.
+            
+            :start: starting part of username to search
+            :limit: maximum limit of accounts to list.
+        """
+
+        params = ["", 1]
+        
+        # custom limits by nektar, hive api limit: 1000
+        custom_limit = within_range(limit, 1, 10000, 100)
+        crawls = custom_limit // 100
+        params[1] = custom_limit
+        if crawls > 0:
+            params[1] = 1000
+
+        params[0] = start
+        if not isinstance(start, str):
+            params[0] = ""
+            start = ""
+
+        results = []
+        alphabet = "abcdefghijklmnopqrstuvwxyz"
+        for letter in alphabet:
+            if not len(start):
+                params[0] = letter
+            for _ in range(crawls):
+                result = self.appbase.api("condenser").lookup_accounts(params)
+                if len(result) < 1000:
+                    break
+                results.extend(result)
+                if len(results) >= custom_limit:
+                    results[:custom_limit]
+            if not len(start):
+                break
+        return results[:custom_limit]
 
     def vote(self, author, permlink, weight, expire=30, synchronous=False, truncated=True, strict=True):
-    
-        if None in (author, permlink):
-            raise
+        """
+            Looks up accounts starting with name.
+            
+            :start: starting part of username to search
+            :limit: maximum limit of accounts to list.
+        """
+        if not isinstance(author, str):
+            raise NektarException("author must be a string.")
 
-        pattern = r"[\w][\w\d]+[\.]{0,1}[\w\d]+"
+        pattern = r"[\w][\w\d\.\-]{2,15}"
         match = re.findall(pattern, author)
         if not len(match):
-            raise
-        
-        pattern = r"[\w][\w\d\-\%]+"
+            raise raise NektarException("author must be a string of length 3 - 16.")
+            
+        pattern = r"[\w][\w\d\-\%]{0,255}"
         match = re.findall(pattern, permlink)
         if not len(match):
-            raise
+            raise raise NektarException("permlink must be a valid url-escaped string.")
         
         weight = within_range(weight, -10000, 10000)
         expire = within_range(expire, 5, 120)
