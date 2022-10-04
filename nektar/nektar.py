@@ -220,7 +220,7 @@ class Waggle:
 
     def posts(self, community=None, sort="created", paidout=None, limit=100):
         """
-            Get ranked posts.
+            Get ranked posts based on tag.
             
             :tag: community name `hive-*` (optional)
             :sort: sort by `trending`, `hot`, `promoted`, `payout`, `payout_comments`, `muted`
@@ -249,7 +249,39 @@ class Waggle:
             filter = [paidout]
         result = self.appbase.api("bridge").get_ranked_posts(params)
         for post in result:
-            if post["is_paidout"] in filter:
+            if not post["depth"] and post["is_paidout"] in filter:
+                results.append(post)
+        return results
+
+    def blogs(self, account=None, sort="posts", paidout=None, limit=20):
+        """
+            Lists posts related to a given account.
+            
+            :acount: any valid account, default = set username (optional)
+            :sort: sort by `blog`, `feed`, `post`, `replies`, or `payout`
+            :limit: maximum limit of posts
+        """
+
+        params = {}
+        params["account"] = self.username
+        if isinstance(account, str):
+            params["account"] = account
+        params["sort"] = "posts"
+        if sort in ("blog", "feed", "replies", "payout"):
+            params["sort"] = sort
+        params["observer"] = self.username
+
+        # custom limits by nektar, hive api limit: 100?
+        limit = within_range(limit, 1, 100, 100)
+        params["limit"] = limit
+
+        results = []
+        filter = [True, False]
+        if isinstance(paidout, bool):
+            filter = [paidout]
+        result = self.appbase.api("bridge").get_account_posts(params)
+        for post in result:
+            if not post["depth"] and post["is_paidout"] in filter:
                 results.append(post)
         return results
 
