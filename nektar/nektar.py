@@ -88,9 +88,9 @@ class Waggle:
         results = []
         for _ in range(crawls):
             result = self.appbase.api("bridge").list_communities(params)
+            results.extend(result)
             if len(result) < 100:
                 break
-            results.extend(result)
             if len(results) >= custom_limit:
                 break
             params["last"] = results[-1]["name"]
@@ -128,9 +128,9 @@ class Waggle:
         results = []
         for _ in range(crawls):
             result = self.appbase.api("bridge").list_subscribers(params)
+            results.extend(result)
             if len(result) < 100:
                 break
-            results.extend(result)
             if len(results) >= custom_limit:
                 break
             params["last"] = results[-1][0]
@@ -165,13 +165,57 @@ class Waggle:
                 params[0] = letter
             for _ in range(crawls):
                 result = self.appbase.api("condenser").lookup_accounts(params)
+                results.extend(result)
                 if len(result) < 1000:
                     break
-                results.extend(result)
                 if len(results) >= custom_limit:
-                    results[:custom_limit]
+                    return results[:custom_limit]
             if not len(start):
                 break
+        return results[:custom_limit]
+
+    def followers(self, account=None, start=None, ignore=False, limit=1000):
+        """
+            Looks up accounts starting with name.
+            
+            :account: get followers of an account, default = username (optional)
+            :start: account to start from, paging mechanism (optional)
+            :ignore: show all muted accounts if True, default = False (optional)
+            :limit: maximum limit of accounts to list. (optional)
+        """
+
+        params = ["", "", "", 1000]
+
+        params[0] = self.username
+        if isinstance(start, str):
+            params[0] = account
+
+        params[1] = ""
+        if isinstance(start, str):
+            params[1] = start
+
+        params[2] = "blog"
+        if not isinstance(ignore, bool):
+            if ignore:
+                params[2] = "ignore"
+        
+        # custom limits by nektar, hive api limit: 1000
+        custom_limit = within_range(limit, 1, 10000, 100)
+        crawls = custom_limit // 100
+        params[3] = custom_limit
+        if crawls > 0:
+            params[3] = 1000
+
+        results = []
+        for _ in range(crawls):
+            result = self.appbase.api("condenser").get_followers(params)
+            for item in result:
+                results.append(item["follower"])
+            if len(result) < 1000:
+                break
+            if len(results) >= custom_limit:
+                break
+            params[1] = results[-1]["follower"]
         return results[:custom_limit]
 
     def posts(self, community=None, sort="created", paidout=None, limit=100):

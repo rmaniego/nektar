@@ -203,12 +203,13 @@ class AppBase:
                                         headers=self.headers,
                                         json=payload,
                                         timeout=self.timeout)
+                response.raise_for_status()
                 break
             except:
                 pass
         if response is None:
             return {}
-        response.raise_for_status()
+
         response = json.loads(response.content.decode("utf-8"))
         if not truncated:
             return response
