@@ -55,7 +55,7 @@ class Waggle:
         ref_block_prefix = struct.unpack_from("<I", unhexlify(previous), 4)[0]
         return ref_block_num, ref_block_prefix
 
-    def communities(self, last=None, limit=100, sort="rank", query=None):
+    def communities(self, last=None, sort="rank", limit=100, query=None):
         """
             List all communities.
             
@@ -174,26 +174,28 @@ class Waggle:
                 break
         return results[:custom_limit]
 
-    def posts(self, community=None, limit=100, sort="created"):
+    def posts(self, community=None, sort="created", limit=100):
         """
             Get ranked posts.
             
-            :community: community name `hive-*` (optional)
-            :limit: maximum limit of blogs
+            :tag: community name `hive-*` (optional)
             :sort: sort by `trending`, `hot`, `promoted`, `payout`, `payout_comments`, `muted`
+            :limit: maximum limit of blogs
         """
 
         params = {}
-        params["observer"] = self.username
+        params["tag"] = ""
         if isinstance(community, str):
             match = re.findall(r"\bhive-[\d]{1,6}\b", community)
             if len(match):
-                params["community"] = community
+                params["tag"] = community
         params["sort"] = "created"
         if sort in ("trending", "hot", "promoted", "payout", "payout_comments", "muted"):
             params["sort"] = sort
-        # custom limits by nektar, hive api limit: 1000?
-        custom_limit = within_range(limit, 1, 1000, 100)
+        params["observer"] = self.username
+
+        # custom limits by nektar, hive api limit: 100?
+        custom_limit = within_range(limit, 1, 100, 100)
 
         return self.appbase.api("bridge").get_ranked_posts(params)[:custom_limit]
 

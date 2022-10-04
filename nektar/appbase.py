@@ -148,7 +148,6 @@ class AppBase:
             params = [params]
             if method in broadcast_methods[2:]:
                 params = { "trx": params[0] }
-        
         if method in broadcast_methods:
             return broadcast(method, params, truncated)
         return self.request(method, params, truncated)

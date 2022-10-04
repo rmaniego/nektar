@@ -50,6 +50,15 @@ for subscriber in hive.subscribers(community, limit=1000):
 
 accounts = hive.accounts(start="h", limit=1000)
 
+community = community = list(communities.keys())[5]
+posts = hive.posts(community, limit=100, sort="created")
+print(posts[0])
+
+tag = "nature"
+posts = hive.posts(tag, limit=10, sort="created")
+for post in posts:
+    print(post["title"])
+
 author = ""
 permlink = ""
 weight = 10000
