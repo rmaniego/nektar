@@ -55,21 +55,21 @@ class Waggle:
         ref_block_prefix = struct.unpack_from("<I", unhexlify(previous), 4)[0]
         return ref_block_num, ref_block_prefix
 
-    def communities(self, last=None, limit=100, sorting="rank", query=None):
+    def communities(self, last=None, limit=100, sort="rank", query=None):
         """
             List all communities.
             
             :last: last known community name `hive-*`, paging mechanism (optional)
             :limit: maximum limit of communities to list.
-            :sorting: sort by `rank`, `new`, or `subs`
+            :sort: sort by `rank`, `new`, or `subs`
             :query: additional filter keywords for search
         """
 
         params = {}
         params["observer"] = self.username
         params["sort"] = "rank"
-        if sorting in ("new", "sub"):
-            params["sort"] = sorting
+        if sort in ("new", "sub"):
+            params["sort"] = sort
         if isinstance(last, str):
             params["query"] = query
         
@@ -174,6 +174,29 @@ class Waggle:
                 break
         return results[:custom_limit]
 
+    def posts(self, community=None, limit=100, sort="created"):
+        """
+            Get ranked posts.
+            
+            :community: community name `hive-*` (optional)
+            :limit: maximum limit of blogs
+            :sort: sort by `trending`, `hot`, `promoted`, `payout`, `payout_comments`, `muted`
+        """
+
+        params = {}
+        params["observer"] = self.username
+        if isinstance(community, str):
+            match = re.findall(r"\bhive-[\d]{1,6}\b", community)
+            if len(match):
+                params["community"] = community
+        params["sort"] = "created"
+        if sort in ("trending", "hot", "promoted", "payout", "payout_comments", "muted"):
+            params["sort"] = sort
+        # custom limits by nektar, hive api limit: 1000?
+        custom_limit = within_range(limit, 1, 1000, 100)
+
+        return self.appbase.api("bridge").get_ranked_posts(params)[:custom_limit]
+
     def vote(self, author, permlink, weight, expire=30, synchronous=False, truncated=True, strict=True):
         """
             Looks up accounts starting with name.
@@ -187,12 +210,12 @@ class Waggle:
         pattern = r"[\w][\w\d\.\-]{2,15}"
         match = re.findall(pattern, author)
         if not len(match):
-            raise raise NektarException("author must be a string of length 3 - 16.")
+            raise NektarException("author must be a string of length 3 - 16.")
             
         pattern = r"[\w][\w\d\-\%]{0,255}"
         match = re.findall(pattern, permlink)
         if not len(match):
-            raise raise NektarException("permlink must be a valid url-escaped string.")
+            raise NektarException("permlink must be a valid url-escaped string.")
         
         weight = within_range(weight, -10000, 10000)
         expire = within_range(expire, 5, 120)

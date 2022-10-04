@@ -31,15 +31,15 @@ username = ""
 hive = Waggle(username)
 hive.append_wif("5*")
 
-communities = hive.communities(limit=1000, sorting="subs")
+communities = hive.communities(limit=1000, sort="subs")
 for community in communities:
     print(community["name"] + "\t" + community["title"])
 
 
 communities = {}
-sortings = ["new", "rank", "subs"]
-for sorting in sortings:
-    for community in hive.communities(limit=1000, sorting=sorting):
+sorting = ["new", "rank", "subs"]
+for sort in sorting:
+    for community in hive.communities(limit=1000, sort=sort):
         communities.update({community["name"]: community})
 
 subscribers = {}
