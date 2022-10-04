@@ -73,7 +73,7 @@ class Waggle:
         if isinstance(last, str):
             params["query"] = query
         
-        custom_limit = within_range(limit, 1, 1000, 100)
+        custom_limit = within_range(limit, 1, 1000000, 100)
         crawls = custom_limit // 100
         params["limit"] = custom_limit
         if crawls > 0:
@@ -86,9 +86,49 @@ class Waggle:
 
         communities = []
         for _ in range(crawls):
-            communities.extend(self.appbase.api("bridge").list_communities(params))
+            result = self.appbase.api("bridge").list_communities(params)
+            if len(result) < 100:
+                break
+            communities.extend(result)
             params["last"] = communities[-1]["name"]
         return communities[0:custom_limit]
+
+    def subscribers(self, community, last=None, limit=100):
+        """
+            Gets a list of subscribers for a given community.
+            
+            :community: community name `hive-*`
+            :last: last known subscriber username (optional)
+            :limit: maximum limit of communities to list.
+        """
+
+        params = {}
+
+        params["community"] = community
+        if isinstance(community, str):
+            match = re.findall(r"\bhive-[\d]{1,6}\b", community)
+            if not len(match):
+                raise NektarException(f"Community name '{community}' format is unsupported.")
+        
+        custom_limit = within_range(limit, 1, 1000000, 100)
+        crawls = custom_limit // 100
+        params["limit"] = custom_limit
+        if crawls > 0:
+            params["limit"] = 100
+
+        if isinstance(last, str):
+            match = re.findall(r"\bhive-[\d]{1,6}\b", last)
+            if len(match):
+                params["last"] = last
+
+        subscribers = []
+        for _ in range(crawls):
+            result = self.appbase.api("bridge").list_subscribers(params)
+            if len(result) < 100:
+                break
+            subscribers.extend(result)
+            params["last"] = subscribers[-1][0]
+        return subscribers[0:custom_limit]
 
     def vote(self, author, permlink, weight, expire=30, synchronous=False, truncated=True, strict=True):
     

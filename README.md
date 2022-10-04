@@ -37,10 +37,16 @@ for community in communities:
 
 
 communities = {}
-    sortings = ["new", "rank", "subs"]
-    for sorting in sortings:
-        for community in hive.communities(limit=1000, sorting=sorting):
-            communities.update({community["name"]: community})
+sortings = ["new", "rank", "subs"]
+for sorting in sortings:
+    for community in hive.communities(limit=1000, sorting=sorting):
+        communities.update({community["name"]: community})
+
+subscribers = {}
+community = list(communities.keys())[0]
+for subscriber in hive.subscribers(community, limit=1000):
+    subscribers.update({subscriber[0]: subscriber})
+    print(subscriber[0])
 
 author = ""
 permlink = ""

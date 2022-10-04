@@ -19,7 +19,7 @@ from requests.packages.urllib3.util.retry import Retry
 
 from .transactions import sign_transaction, as_bytes
 from .constants import NEKTAR_VERSION, NODES, APPBASE_API, BLOCKCHAIN_OPERATIONS
-from .exceptions import RPCNektarException, NektarException, NektarException, NektarException
+from .exceptions import RPCNektarException, NektarException
 
 class AppBase:
     def __init__(self,
