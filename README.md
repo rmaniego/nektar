@@ -28,14 +28,25 @@ This is compatible with Python 3.9 or later.
 from nektar import Waggle
 
 username = ""
-dapp = Waggle(username)
-dapp.append_wif("5*")
+hive = Waggle(username)
+hive.append_wif("5*")
+
+communities = hive.communities(limit=1000, sorting="subs")
+for community in communities:
+    print(community["name"] + "\t" + community["title"])
+
+
+communities = {}
+    sortings = ["new", "rank", "subs"]
+    for sorting in sortings:
+        for community in hive.communities(limit=1000, sorting=sorting):
+            communities.update({community["name"]: community})
 
 author = ""
 permlink = ""
 weight = 10000
 
-dapp.vote(author, permlink, weight, synchrnous=True, strict=False)
+hive.vote(author, permlink, weight, synchronous=True, strict=False)
 ```
 
 ## AppBase Module
@@ -43,12 +54,12 @@ dapp.vote(author, permlink, weight, synchrnous=True, strict=False)
 ```python
 from appbase import AppBase
 
-dapp = AppBase(username)
-dapp.append_wif("5*")
+hive = AppBase(username)
+hive.append_wif("5*")
 
-props = dapp.api("database").get_dynamic_global_properties({})
+props = hive.api("database").get_dynamic_global_properties({})
 
 username = "nektar"
-account = dapp.api("condenser").get_accounts([[self.username]])
+account = hive.api("condenser").get_accounts([[self.username]])
 
 ```

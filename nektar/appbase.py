@@ -19,7 +19,7 @@ from requests.packages.urllib3.util.retry import Retry
 
 from .transactions import sign_transaction, as_bytes
 from .constants import NEKTAR_VERSION, NODES, APPBASE_API, BLOCKCHAIN_OPERATIONS
-from .exceptions import RPCNodeException, NodeException, APIException, APIMethodException
+from .exceptions import RPCNektarException, NektarException, NektarException, NektarException
 
 class AppBase:
     def __init__(self,
@@ -69,7 +69,7 @@ class AppBase:
             for pattern in patterns:
                 node = re.sub(pattern, "", node)
             if not len(node):
-                raise APIException("Invalid node format.")
+                raise NektarException("Invalid node format.")
             self.nodes.append(node)
 
     def append_wif(self, wifs):
@@ -78,7 +78,7 @@ class AppBase:
         if isinstance(wifs, str):
             wifs = [wifs]
         if not isinstance(wifs, list):
-            raise WIFException("Invalid WIF format.")
+            raise NektarException("Invalid WIF format.")
         for wif in wifs:
             if wif not in self.wifs:
                 self.wifs.append(wif)
@@ -98,9 +98,11 @@ class AppBase:
             self._appbase_api = "condenser_api"
             return self
         if isinstance(name, str):
-            name = name.replace("_api", "") + "_api"
+            name = name.replace("_api", "")
+            if name not in ("bridge",):
+                name += "_api"
         if name not in APPBASE_API:
-            raise APIException(name + " is unsupported.")
+            raise NektarException(name + " is unsupported.")
         self._appbase_api = name
         return self
 
@@ -112,7 +114,7 @@ class AppBase:
     def _dynamic_api_call(self, *args, **kwargs):
         method = args[0]
         if method not in APPBASE_API[self._appbase_api]:
-            raise APIMethodException(name + " is unsupported.")
+            raise NektarException(name + " is unsupported.")
         method = self._appbase_api + "." + method
         
         params = []
@@ -121,7 +123,7 @@ class AppBase:
         else:
             if self._appbase_api == "condenser_api":
                 params = {}
-        
+
         # get full JSON-RPC response, or not
         truncated = True
         if "truncated" in kwargs:
@@ -164,7 +166,7 @@ class AppBase:
         ## check if operations are valid
         for operation in transaction["operations"]:
             if operation[0] not in BLOCKCHAIN_OPERATIONS:
-                raise OperationException(operation[0] + " is unsupported")
+                raise NektarException(operation[0] + " is unsupported")
         
         if "signatures" in transaction:
             transaction.pop("transaction", None)
@@ -215,7 +217,7 @@ class AppBase:
             return response["result"]
         if "error" in response:
             if strict:
-                raise RPCNodeException(response["error"].get("message"), code=response["error"].get("code"), raw_body=response)
+                raise RPCNektarException(response["error"].get("message"), code=response["error"].get("code"), raw_body=response)
         return {}
 
 def _format_payload(method, params, rid):

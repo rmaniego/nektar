@@ -18,7 +18,7 @@ from binascii import hexlify, unhexlify
 
 from .appbase import AppBase
 from .constants import DATETIME_FORMAT
-from .exceptions import IntRangeException
+from .exceptions import NektarException
 
 class Waggle:
     def __init__(self, username, wifs=None):
@@ -55,7 +55,45 @@ class Waggle:
         ref_block_prefix = struct.unpack_from("<I", unhexlify(previous), 4)[0]
         return ref_block_num, ref_block_prefix
 
-    def vote(self, author, permlink, weight, expire=30, synchronous=True, truncated=True, strict=True):
+    def communities(self, last=None, limit=100, sorting="rank", query=None):
+        """
+            List all communities.
+            
+            :last: last known community name `hive-*` (optional)
+            :limit: maximum limit of communities to list.
+            :sorting: sort by `rank`, `new`, or `subs`
+            :query: additional filter keywords for search
+        """
+
+        params = {}
+        params["observer"] = self.username
+        params["sort"] = "rank"
+        if sorting in ("new", "sub"):
+            params["sort"] = sorting
+        if isinstance(last, str):
+            params["query"] = query
+        
+        custom_limit = within_range(limit, 1, 1000, 100)
+        crawls = custom_limit // 100
+        params["limit"] = custom_limit
+        if crawls > 0:
+            params["limit"] = 100
+
+        if isinstance(last, str):
+            match = re.findall(r"\bhive-[\d]{1,6}\b", last)
+            if len(match):
+                params["last"] = last
+
+        communities = []
+        for _ in range(crawls):
+            communities.extend(self.appbase.api("bridge").list_communities(params))
+            params["last"] = communities[-1]["name"]
+        return communities[0:custom_limit]
+
+    def vote(self, author, permlink, weight, expire=30, synchronous=False, truncated=True, strict=True):
+    
+        if None in (author, permlink):
+            raise
 
         pattern = r"[\w][\w\d]+[\.]{0,1}[\w\d]+"
         match = re.findall(pattern, author)
@@ -92,15 +130,21 @@ class Waggle:
                 return result
         return self.appbase.broadcast(method, transaction, truncated, strict)
 
+##############################
+# utils                      #
+##############################
+
 def _make_expiration(secs=30):
     timestamp = time.time() + int(secs)
     return datetime.utcfromtimestamp(timestamp).strftime(DATETIME_FORMAT)
 
-def within_range(value, minimum, maximum):
-    if not isinstance(value, int):
-        raise IntRangeException(f"Integer value must be within {minimum} to {maximum} only.")
+def within_range(value, minimum, maximum, fallback=None):
+    if not isinstance(value, int) and not isinstance(fallback, (None, int)):
+        raise NektarException(f"Input values must be integers.")
     if not (1 <= value <= 10000):
-        raise IntRangeException(f"Integer value must be within {minimum} to {maximum} only.")
+        if fallback is None:
+            raise NektarException(f"Integer value must be within {minimum} to {maximum} only.")
+        return fallback
     return value
 
 def true_or_false(value, fallback):
