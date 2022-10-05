@@ -236,9 +236,10 @@ class AppBase:
 #########################
 
 def _get_necessary_wifs(wifs, operation):
-    return [wifs[role]
-            for role in ROLES[operation]
-                if role in wifs]
+    for role in ROLES[operation]:
+        if role in wifs:
+            return [wifs[role]]
+    return []
 
 def _format_payload(method, params, rid):
     return {
