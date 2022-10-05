@@ -365,7 +365,7 @@ class Waggle:
         ## initialize transaction data
         ref_block_num, ref_block_prefix = self.get_reference_block_data()
         expiration = _make_expiration(expire)
-        expire = within_range(expire, 5, 120)
+        expire = within_range(expire, 5, 120, 30)
         synchronous = true_or_false(synchronous, False)
 
         operations = [[ "comment", data ]]
@@ -416,7 +416,7 @@ class Waggle:
         ## initialize transaction data
         ref_block_num, ref_block_prefix = self.get_reference_block_data()
         expiration = _make_expiration(expire)
-        expire = within_range(expire, 5, 120)
+        expire = within_range(expire, 5, 120, 30)
         synchronous = true_or_false(synchronous, False)
 
         operations = [[ "comment", data ]]
@@ -454,8 +454,8 @@ class Waggle:
             raise NektarException("permlink must be a valid url-escaped string.")
         
         ref_block_num, ref_block_prefix = self.get_reference_block_data()
-        weight = within_range(weight, -10000, 10000)
-        expire = within_range(expire, 5, 120)
+        weight = within_range(weight, -10000, 10000, 10000)
+        expire = within_range(expire, 5, 120, 30)
         expiration = _make_expiration(expire)
         synchronous = true_or_false(synchronous, False)
 
@@ -506,7 +506,7 @@ class Waggle:
         data["memo"] = message
         
         ref_block_num, ref_block_prefix = self.get_reference_block_data()
-        expire = within_range(expire, 5, 120)
+        expire = within_range(expire, 5, 120, 30)
         expiration = _make_expiration(expire)
         synchronous = true_or_false(synchronous, False)
 
@@ -556,7 +556,7 @@ class Waggle:
         data["json"] = json.dumps(json_data).replace("'", "\\\"")
         
         ref_block_num, ref_block_prefix = self.get_reference_block_data()
-        expire = within_range(expire, 5, 120)
+        expire = within_range(expire, 5, 120, 30)
         expiration = _make_expiration(expire)
         synchronous = true_or_false(synchronous, False)
 
@@ -603,10 +603,10 @@ def _make_expiration(secs=30):
     return datetime.utcfromtimestamp(timestamp).strftime(DATETIME_FORMAT)
 
 def within_range(value, minimum, maximum, fallback=None):
-    if not isinstance(value, int) and not isinstance(fallback, (None, int)):
+    if not isinstance(value, int) and not isinstance(fallback, int):
         raise NektarException(f"Input values must be integers.")
-    if not (1 <= value <= 10000):
-        if fallback is None:
+    if not (minimum <= value <= maximum):
+        if fallback is not None:
             raise NektarException(f"Integer value must be within {minimum} to {maximum} only.")
         return fallback
     return value
