@@ -312,6 +312,21 @@ BLOCKCHAIN_OPERATIONS = [
     "hardfork_hive_restore",
 ]
 
+# HIVE PRIVATE KEY ROLES
+ROLES = {
+        "transfer": ["owner", "active"],
+        "comment": ["owner", "active", "posting"],
+        "vote": ["owner", "active", "posting"],
+        "all": ["owner", "active", "posting", "memo"]
+    }
+
+# HIVE ASSETS
+ASSETS = {
+    "HBD": {"nai": "@@000000013", "precision": 3},
+    "HIVE": {"nai": "@@000000021", "precision": 3},
+    "VESTS": {"nai": "@@000000037", "precision": 6}
+}
+
 # Blockchain Transaction Expiration Format in UTC
 DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S%Z"
 

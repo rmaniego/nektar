@@ -176,6 +176,16 @@ weight = 10000  # -10000 to 10000, where 1000 = 100%
 hive.vote(author, permlink, weight)
 ```
 
+**Send a Memo** 
+```python
+
+receiver = "valid-username"
+amount = 0.001
+asset = "HBD"
+message = "Sending you some HBDs..."
+hive.memo(receiver, amount, asset, message)
+```
+
 ## AppBase Module
 **Basic Usage**
 ```python

@@ -17,15 +17,20 @@ from datetime import datetime, timezone
 from binascii import hexlify, unhexlify
 
 from .appbase import AppBase
-from .constants import DATETIME_FORMAT, NEKTAR_VERSION
+from .constants import NEKTAR_VERSION, ASSETS, ROLES, DATETIME_FORMAT
 from .exceptions import NektarException
 
 class Waggle:
-    def __init__(self, username, wifs=None, app=None, version=None):
+    def __init__(self, username, wif=None, role=None, wifs=None, app=None, version=None):
         self.set_username(username)
         
         self.appbase = AppBase()
-        self.appbase.append_wif(wifs)
+        
+        if isinstance(role, str) and isinstance(wif, str):
+            self.appbase.append_wif(role, wif)
+        if isinstance(wifs, dict):
+            self.appbase.append_wif(wifs)
+        self.roles = list(self.appbase.wifs.keys())
 
         self.account = None
         self.refresh()
@@ -76,7 +81,7 @@ class Waggle:
         params = {}
         params["observer"] = self.username
         params["sort"] = "rank"
-        if sort in ("new", "sub"):
+        if sort in ("new", "subs"):
             params["sort"] = sort
         if isinstance(last, str):
             params["query"] = query
@@ -304,6 +309,10 @@ class Waggle:
             :community: the community to post e.g. `hive-*` (optional)
             :format: usually `markdown`
         """
+        
+        if not _check_wifs(self.roles, "comment"):
+            raise NektarException("The `comment` operation requires" \
+                                    "one of the following private keys:" + ", ".join(ROLES["comment"]))
     
         data = {}
         data["author"] = self.username
@@ -375,6 +384,10 @@ class Waggle:
             :permlink: permlink to the blog post being replied to
             :body: body of the comment being submitted
         """
+        
+        if not _check_wifs(self.roles, "comment"):
+            raise NektarException("The `comment` operation requires" \
+                                    "one of the following private keys:" + ", ".join(ROLES["comment"]))
     
         data = {}
         data["author"] = self.username
@@ -421,6 +434,12 @@ class Waggle:
             :start: starting part of username to search
             :limit: maximum limit of accounts to list.
         """
+        
+        
+        if not _check_wifs(self.roles, "vote"):
+            raise NektarException("The `comment` operation requires" \
+                                    "one of the following private keys:" + ", ".join(ROLES["vote"]))
+        
         if not isinstance(author, str):
             raise NektarException("author must be a string.")
 
@@ -447,8 +466,59 @@ class Waggle:
                      "operations": operations,
                      "extensions": [] }
         return self._broadcast(transaction, synchronous, strict)
+
+    def memo(self, receiver, amount, asset, message, expire=30, synchronous=False):
+        """
+            Transfers asset from one account to another.
+            
+            :receiver: a valid hive account username
+            :amount: any positive value
+            :asset: asset type to send, `HBD` or `HIVE` only
+            :message: any utf-8 string up to 2048 bytes only
+        """
+        
+        if not _check_wifs(self.roles, "transfer"):
+            raise NektarException("The `comment` operation requires" \
+                                    "one of the following private keys:" + ", ".join(ROLES["transfer"]))
     
-    def _broadcast(self, transaction, synchronous=False, strict=True):
+        data = {}
+        data["from"] = self.username
+        if not isinstance(receiver, str):
+            raise NektarException("Receiver must be a valid Hive account user.")
+        if self.username == receiver:
+            raise NektarException("Receiver must be unique from the sender.")
+        data["to"] = receiver
+        
+        if not isinstance(amount, (int, float)):
+            raise NektarException("Amount must be a positive numeric value.")
+        if amount <= 0:
+            raise NektarException("Amount must be a positive numeric value.")
+        if asset not in ("HBD", "HIVE"):
+            raise NektarException("Memo only accepts transfer of HBD and HIVE assets.")
+        
+        amount = round(amount, ASSETS[asset]["precision"])
+        data["amount"] = str(amount) + " " + asset
+        
+        if not isinstance(message, str):
+            raise NektarException("Memo message must be a UTF-8 string.")
+        if not (len(message.encode("utf-8")) <= 256):
+            raise NektarException("Memo message must be not more than 2048 bytes.")
+        data["memo"] = message
+        
+        ref_block_num, ref_block_prefix = self.get_reference_block_data()
+        expire = within_range(expire, 5, 120)
+        expiration = _make_expiration(expire)
+        synchronous = true_or_false(synchronous, False)
+
+        operations = [[ "transfer", data ]]
+        transaction = { "ref_block_num": ref_block_num,
+                     "ref_block_prefix": ref_block_prefix,
+                     "expiration": expiration,
+                     "operations": operations,
+                     "extensions": [] }
+        return self._broadcast(transaction, synchronous)
+    
+    def _broadcast(self, transaction, synchronous, strict=True):
         method = "condenser_api.broadcast_transaction"
         if synchronous:
             method = "condenser_api.broadcast_transaction_synchronous"
@@ -460,6 +530,10 @@ class Waggle:
 ##############################
 # utils                      #
 ##############################
+
+def _check_wifs(roles, operation):
+    return len([role for role in ROLES[operation]
+        if role in roles])
 
 def _make_expiration(secs=30):
     timestamp = time.time() + int(secs)

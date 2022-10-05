@@ -18,8 +18,8 @@ from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 
 from .transactions import sign_transaction, as_bytes
-from .constants import NEKTAR_VERSION, NODES, APPBASE_API, BLOCKCHAIN_OPERATIONS
-from .exceptions import RPCNektarException, NektarException
+from .constants import NEKTAR_VERSION, NODES, APPBASE_API, BLOCKCHAIN_OPERATIONS, ROLES
+from .exceptions import NektarException
 
 class AppBase:
     def __init__(self,
@@ -50,7 +50,7 @@ class AppBase:
         self.nodes = NODES
         self.custom_nodes(nodes)
         
-        self.wifs = []
+        self.wifs = {}
         self.chain_id = self.api("database").get_version({})["chain_id"]
         self._transaction_id = None
     
@@ -71,16 +71,25 @@ class AppBase:
                 raise NektarException("Invalid node format.")
             self.nodes.append(node)
 
-    def append_wif(self, wifs):
-        if wifs is None:
+    def append_wif(self, role, wif=None):
+        """
+            Append WIF and the associated role of it for signing transactions.
+            
+            If `wif` is empty, role is expected to be a dictionary containing a valid role-wif pairs.
+            
+            :role: role of private key being appended, must be `owner`, `active`, `posting`, or `memo` only.
+            :wif: a valid private key
+        """
+        if isinstance(role, dict):
+            for r, w in role.items():
+                self.append_wif(r, w)
             return
-        if isinstance(wifs, str):
-            wifs = [wifs]
-        if not isinstance(wifs, list):
-            raise NektarException("Invalid WIF format.")
-        for wif in wifs:
-            if wif not in self.wifs:
-                self.wifs.append(wif)
+        if not isinstance(role, str) and not isinstance(wif, str):
+            raise NektarException("Role and WIF must be a valid string.")
+        if role not in ROLES["all"]:
+            raise NektarException("Role must be `owner`, `active`, `posting`, or `memo` only.")
+        if wif not in list(self.wifs.values()):
+            self.wifs[role] = wif
 
     def set_retries(self, retries):
         if isinstance(retries, int):
@@ -157,9 +166,11 @@ class AppBase:
 
     def broadcast(self, method, transaction, strict=True):
         ## check if operations are valid
-        for operation in transaction["operations"]:
-            if operation[0] not in BLOCKCHAIN_OPERATIONS:
-                raise NektarException(operation[0] + " is unsupported")
+        operation = ""
+        for op in transaction["operations"]:
+            if op[0] not in BLOCKCHAIN_OPERATIONS:
+                raise NektarException(op[0] + " is unsupported")
+            operation = op[0]
         
         if "signatures" in transaction:
             transaction.pop("transaction", None)
@@ -172,7 +183,8 @@ class AppBase:
         self._transaction_id = hexlify(hashed[:20]).decode("ascii")
         
         ## update transaction signature
-        transaction["signatures"] = sign_transaction(self.chain_id, serialized_transaction, self.wifs)
+        wifs = _get_necesarry_wifs(self.wifs, operation)
+        transaction["signatures"] = sign_transaction(self.chain_id, serialized_transaction, wifs)
         
         self.rid += 1
         params = [transaction]
@@ -211,6 +223,15 @@ class AppBase:
             if strict:
                 raise NektarException(response["error"].get("message"))
         return {}
+
+#########################
+# utils                 #
+#########################
+
+def _get_necesarry_wifs(wifs, operation):
+    return [wifs[role]
+                for role in ROLES[operation]
+                    if role in wifs]
 
 def _format_payload(method, params, rid):
     return {
