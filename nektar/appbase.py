@@ -53,7 +53,6 @@ class AppBase:
         self.wifs = []
         self.chain_id = self.api("database").get_version({})["chain_id"]
         self._transaction_id = None
-        
     
     def custom_nodes(self, nodes):
         """
@@ -123,11 +122,6 @@ class AppBase:
         else:
             if self._appbase_api == "condenser_api":
                 params = {}
-
-        # get full JSON-RPC response, or not
-        truncated = True
-        if "truncated" in kwargs:
-            truncated = kwargs["truncated"]
         
         # raise exception on error or not
         strict = True
@@ -149,19 +143,19 @@ class AppBase:
             if method in broadcast_methods[2:]:
                 params = { "trx": params[0] }
         if method in broadcast_methods:
-            return broadcast(method, params, truncated)
-        return self.request(method, params, truncated)
+            return broadcast(method, params)
+        return self.request(method, params)
 
-    def request(self, method, params, truncated):
+    def request(self, method, params):
         """
             Send predefined params as JSON-RPC request.
         """
         self.rid += 1
         payload = _format_payload(method, params, self.rid)
-        return self._send_request(payload, truncated)
+        return self._send_request(payload)
         
 
-    def broadcast(self, method, transaction, truncated, strict=True):
+    def broadcast(self, method, transaction, strict=True):
         ## check if operations are valid
         for operation in transaction["operations"]:
             if operation[0] not in BLOCKCHAIN_OPERATIONS:
@@ -183,7 +177,7 @@ class AppBase:
         self.rid += 1
         params = [transaction]
         payload = _format_payload(method, params, self.rid)
-        result = self._send_request(payload, truncated, strict)
+        result = self._send_request(payload, strict)
         if method == "condenser_api.broadcast_transaction" and not strict:
             return self.api("condenser_api").get_transaction([transaction_id])
         return result
@@ -194,7 +188,7 @@ class AppBase:
         """
         return self.api("condenser").get_transaction_hex([transaction])
 
-    def _send_request(self, payload, truncated=True, strict=True):
+    def _send_request(self, payload, strict=True):
         response = None
         for node in self.nodes:
             try:
@@ -211,8 +205,6 @@ class AppBase:
             return {}
 
         response = json.loads(response.content.decode("utf-8"))
-        if not truncated:
-            return response
         if "result" in response:
             return response["result"]
         if "error" in response:

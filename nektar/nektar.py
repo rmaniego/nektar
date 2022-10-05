@@ -231,7 +231,7 @@ class Waggle:
             Get ranked posts based on tag.
             
             :tag: community name `hive-*` (optional)
-            :sort: sort by `trending`, `hot`, `promoted`, `payout`, `payout_comments`, `muted`
+            :sort: sort by `created`, `trending`, `hot`, `promoted`, `payout`, `payout_comments`, or `muted`
             :paidout: return new (False), paidout (True), all (None)
             :limit: maximum limit of blogs
         """
@@ -293,7 +293,7 @@ class Waggle:
                 results.append(post)
         return results
 
-    def new_post(self, title, body, description=None, tags=None, community=None, format=None, expire=30, synchronous=False):
+    def new_post(self, title, body, description=None, tags=None, community=None, expire=30, synchronous=False):
         """
             Create a new post.
             
@@ -305,15 +305,15 @@ class Waggle:
             :format: usually `markdown`
         """
     
-        comment = {}
-        comment["author"] = self.username
+        data = {}
+        data["author"] = self.username
         
         if not isinstance(title, str):
             raise NektarException("Title must be a UTF-8 string.")
         title = re.sub(r"[\r\n]", "", title)
         if not (1 <= len(title.encode("utf-8")) <= 256):
             raise NektarException("Title must be within 1 to 256 bytes.")
-        comment["title"] = title
+        data["title"] = title
         
         if not isinstance(body, str):
             raise NektarException("Body must be a UTF-8 string.")
@@ -322,19 +322,21 @@ class Waggle:
         # body = body.replace("\r\n", "\\\n")
         # body = body.replace("\n", "\\\n")
         # body = body.replace("\"", "\\\"")
-        comment["body"] = body
+        data["body"] = body
         
         permlink = re.sub(r"[^\w\ ]", "", title.lower())
         permlink = permlink.replace(" ", "-")
-        comment["permlink"] = permlink
-        comment["parent_author"] = ""
+        data["permlink"] = permlink
+        data["parent_author"] = ""
 
-        comment["parent_permlink"] = ""
+        ## set parent permlink as empty, or the community being posted to
+        data["parent_permlink"] = ""
         if isinstance(community, str):
             if not len(re.findall(r"hive-[\d]{1,}", community)):
                 raise NektarException("Community name must follow `hive-*` format.")
-            comment["parent_permlink"] = community
+            data["parent_permlink"] = community
         
+        ## create blog metadata
         json_metadata = {}
         json_metadata["description"] = ""
         if isinstance(description, str):
@@ -346,20 +348,18 @@ class Waggle:
         if isinstance(tags, str):
             json_metadata["tags"] = list(re.sub(r"[^\w\ ]", "", tags).split(" "))
         json_metadata["format"] = "markdown"
-        if isinstance(format, str):
-            json_metadata["format"] = format
         json_metadata["app"] = self.app + "/" + self.version
-
-        temp = json.dumps(json_metadata)
-        comment["json_metadata"] = temp.replace("'", "\\\"")
+        pattern_images = r"[!]\[[\w\ \-._~!$&'()*+,;=:@#\/?]*\]\([\w\-._~!$&'()*+,;=:@#\/?]+\)"
+        json_metadata["image"] = list(re.findall(pattern_images, body))
+        data["json_metadata"] = json.dumps(json_metadata).replace("'", "\\\"")
         
-        
+        ## initialize transaction data
         ref_block_num, ref_block_prefix = self.get_reference_block_data()
         expiration = _make_expiration(expire)
         expire = within_range(expire, 5, 120)
         synchronous = true_or_false(synchronous, False)
 
-        operations = [[ "comment", comment ]]
+        operations = [[ "comment", data ]]
         transaction = { "ref_block_num": ref_block_num,
                      "ref_block_prefix": ref_block_prefix,
                      "expiration": expiration,
@@ -367,7 +367,54 @@ class Waggle:
                      "extensions": [] }
         return self._broadcast(transaction, synchronous)
 
-    def vote(self, author, permlink, weight, expire=30, synchronous=False, truncated=True, strict=True):
+    def reply(self, author, permlink, body, expire=30, synchronous=False):
+        """
+            Create a new comment to a post.
+            
+            :author: username of author of the blog post being replied to
+            :permlink: permlink to the blog post being replied to
+            :body: body of the comment being submitted
+        """
+    
+        data = {}
+        data["author"] = self.username
+        data["title"] = ""
+        
+        data["parent_author"] = author
+        data["parent_permlink"] = permlink
+        
+        if not isinstance(body, str):
+            raise NektarException("Body must be a UTF-8 string.")
+        if not len(body.encode("utf-8")):
+            raise NektarException("Body must be at least 1 byte.")
+        data["body"] = body
+       
+        data["permlink"] = ("re-" + permlink)[:255]
+        
+        ## create comment metadata
+        json_metadata = {}
+        json_metadata["description"] = ""
+        json_metadata["format"] = "markdown"
+        json_metadata["app"] = self.app + "/" + self.version
+        pattern_images = r"[!]\[[\w\ \-._~!$&'()*+,;=:@#\/?]*\]\([\w\-._~!$&'()*+,;=:@#\/?]+\)"
+        json_metadata["image"] = list(re.findall(pattern_images, body))
+        data["json_metadata"] = json.dumps(json_metadata).replace("'", "\\\"")
+        
+        ## initialize transaction data
+        ref_block_num, ref_block_prefix = self.get_reference_block_data()
+        expiration = _make_expiration(expire)
+        expire = within_range(expire, 5, 120)
+        synchronous = true_or_false(synchronous, False)
+
+        operations = [[ "comment", data ]]
+        transaction = { "ref_block_num": ref_block_num,
+                     "ref_block_prefix": ref_block_prefix,
+                     "expiration": expiration,
+                     "operations": operations,
+                     "extensions": [] }
+        return self._broadcast(transaction, synchronous)
+
+    def vote(self, author, permlink, weight, expire=30, synchronous=False, strict=True):
         """
             Looks up accounts starting with name.
             
@@ -391,8 +438,7 @@ class Waggle:
         weight = within_range(weight, -10000, 10000)
         expire = within_range(expire, 5, 120)
         expiration = _make_expiration(expire)
-        synchronous = true_or_false(synchronous, True)
-        truncated = true_or_false(truncated, True)
+        synchronous = true_or_false(synchronous, False)
 
         operations = [[ "vote", { "voter": self.username, "author": author, "permlink": permlink, "weight": weight } ]]
         transaction = { "ref_block_num": ref_block_num,
@@ -400,16 +446,16 @@ class Waggle:
                      "expiration": expiration,
                      "operations": operations,
                      "extensions": [] }
-        return self._broadcast(transaction, synchronous, truncated, strict)
+        return self._broadcast(transaction, synchronous, strict)
     
-    def _broadcast(self, transaction, synchronous=True, truncated=True, strict=True):
+    def _broadcast(self, transaction, synchronous=False, strict=True):
         method = "condenser_api.broadcast_transaction"
         if synchronous:
             method = "condenser_api.broadcast_transaction_synchronous"
-            result = self.appbase.broadcast(method, transaction, truncated, strict)
+            result = self.appbase.broadcast(method, transaction, strict)
             if result:
                 return result
-        return self.appbase.broadcast(method, transaction, truncated, strict)
+        return self.appbase.broadcast(method, transaction, strict)
 
 ##############################
 # utils                      #
