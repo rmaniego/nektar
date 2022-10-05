@@ -17,11 +17,11 @@ from datetime import datetime, timezone
 from binascii import hexlify, unhexlify
 
 from .appbase import AppBase
-from .constants import DATETIME_FORMAT
+from .constants import DATETIME_FORMAT, NEKTAR_VERSION
 from .exceptions import NektarException
 
 class Waggle:
-    def __init__(self, username, wifs=None):
+    def __init__(self, username, wifs=None, app=None, version=None):
         self.set_username(username)
         
         self.appbase = AppBase()
@@ -29,10 +29,18 @@ class Waggle:
 
         self.account = None
         self.refresh()
+        
+        self.app = "nektar"
+        if isinstance(app, str):
+            self.app = app
+        
+        self.version = NEKTAR_VERSION
+        if isinstance(version, str):
+            self.version = version
 
     def set_username(self, username):
         if not isinstance(username, str):
-            raise
+            raise NektarException("Username must be a valid Hive account username.")
         self.username = username.replace("@", "")
 
     def refresh(self):
@@ -285,6 +293,80 @@ class Waggle:
                 results.append(post)
         return results
 
+    def new_post(self, title, body, description=None, tags=None, community=None, format=None, expire=30, synchronous=False):
+        """
+            Create a new post.
+            
+            :title: a human readable title of the post being submitted
+            :body: body of the post being submitted
+            :description: the very short summary of the post
+            :tags: a space separated list of tags
+            :community: the community to post e.g. `hive-*` (optional)
+            :format: usually `markdown`
+        """
+    
+        comment = {}
+        comment["author"] = self.username
+        
+        if not isinstance(title, str):
+            raise NektarException("Title must be a UTF-8 string.")
+        title = re.sub(r"[\r\n]", "", title)
+        if not (1 <= len(title.encode("utf-8")) <= 256):
+            raise NektarException("Title must be within 1 to 256 bytes.")
+        comment["title"] = title
+        
+        if not isinstance(body, str):
+            raise NektarException("Body must be a UTF-8 string.")
+        if not len(body.encode("utf-8")):
+            raise NektarException("Body must be at least 1 byte.")
+        # body = body.replace("\r\n", "\\\n")
+        # body = body.replace("\n", "\\\n")
+        # body = body.replace("\"", "\\\"")
+        comment["body"] = body
+        
+        permlink = re.sub(r"[^\w\ ]", "", title.lower())
+        permlink = permlink.replace(" ", "-")
+        comment["permlink"] = permlink
+        comment["parent_author"] = ""
+
+        comment["parent_permlink"] = ""
+        if isinstance(community, str):
+            if not len(re.findall(r"hive-[\d]{1,}", community)):
+                raise NektarException("Community name must follow `hive-*` format.")
+            comment["parent_permlink"] = community
+        
+        json_metadata = {}
+        json_metadata["description"] = ""
+        if isinstance(description, str):
+            description = re.sub(r"[\r\n]", "", description)
+            json_metadata["description"] = description
+        ## make sure tags are valid
+        ## accept more than 5, but only looks for the first five
+        json_metadata["tags"] = []
+        if isinstance(tags, str):
+            json_metadata["tags"] = list(re.sub(r"[^\w\ ]", "", tags).split(" "))
+        json_metadata["format"] = "markdown"
+        if isinstance(format, str):
+            json_metadata["format"] = format
+        json_metadata["app"] = self.app + "/" + self.version
+
+        temp = json.dumps(json_metadata)
+        comment["json_metadata"] = temp.replace("'", "\\\"")
+        
+        
+        ref_block_num, ref_block_prefix = self.get_reference_block_data()
+        expiration = _make_expiration(expire)
+        expire = within_range(expire, 5, 120)
+        synchronous = true_or_false(synchronous, False)
+
+        operations = [[ "comment", comment ]]
+        transaction = { "ref_block_num": ref_block_num,
+                     "ref_block_prefix": ref_block_prefix,
+                     "expiration": expiration,
+                     "operations": operations,
+                     "extensions": [] }
+        return self._broadcast(transaction, synchronous)
+
     def vote(self, author, permlink, weight, expire=30, synchronous=False, truncated=True, strict=True):
         """
             Looks up accounts starting with name.
@@ -305,13 +387,12 @@ class Waggle:
         if not len(match):
             raise NektarException("permlink must be a valid url-escaped string.")
         
+        ref_block_num, ref_block_prefix = self.get_reference_block_data()
         weight = within_range(weight, -10000, 10000)
         expire = within_range(expire, 5, 120)
+        expiration = _make_expiration(expire)
         synchronous = true_or_false(synchronous, True)
         truncated = true_or_false(truncated, True)
-        
-        expiration = _make_expiration(expire)
-        ref_block_num, ref_block_prefix = self.get_reference_block_data()
 
         operations = [[ "vote", { "voter": self.username, "author": author, "permlink": permlink, "weight": weight } ]]
         transaction = { "ref_block_num": ref_block_num,

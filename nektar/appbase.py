@@ -217,7 +217,7 @@ class AppBase:
             return response["result"]
         if "error" in response:
             if strict:
-                raise RPCNektarException(response["error"].get("message"), code=response["error"].get("code"), raw_body=response)
+                raise NektarException(response["error"].get("message"))
         return {}
 
 def _format_payload(method, params, rid):
