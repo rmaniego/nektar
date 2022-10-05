@@ -474,7 +474,7 @@ class Waggle:
             :receiver: a valid hive account username
             :amount: any positive value
             :asset: asset type to send, `HBD` or `HIVE` only
-            :message: any utf-8 string up to 2048 bytes only
+            :message: any UTF-8 string up to 2048 bytes only
         """
         
         if not _check_wifs(self.roles, "transfer"):
@@ -517,6 +517,69 @@ class Waggle:
                      "operations": operations,
                      "extensions": [] }
         return self._broadcast(transaction, synchronous)
+
+    def custom_json(self, protocol_id, json_data, required_auths, required_posting_auths, expire=30, synchronous=False):
+        """
+            Provides a generic way to add higher level protocols.
+            
+            :protocol_id: a valid string in a lowercase snake case form
+            :json_data: any valid JSON data
+            :required_auths: account usernames required to sign with private keys
+            :required_posting_auths: account usernames required to sign with a `posting` private key
+        """
+    
+        data = {}    
+        roles = "posting" # initial required role
+        
+        if not isinstance(required_auths, list):
+            raise NektarException("The `required_auths` requires a list of valid usernames.")
+        data["required_auths"] = required_auths
+        
+        # if required auths is not empty, include owner,
+        # active and posting roles
+        if len(required_auths):
+            roles = "custom_json"
+        if not _check_wifs(self.roles, roles):
+            raise NektarException("The `custom_json` operation requires" \
+                                    "one of the following private keys:" + ", ".join(ROLES[roles]))
+
+        if not isinstance(required_posting_auths, list):
+            raise NektarException("The `required_posting_auths` requires a list of valid usernames.")
+        data["required_posting_auths"] = required_posting_auths
+        
+        if len(re.findall(r"[^\w]+", protocol_id)):
+            raise NektarException("Custom JSON id must be a valid string preferrably in lowercase and snake case format.")
+        data["id"] = protocol_id
+        
+        if not isinstance(json_data, dict):
+            raise NektarException("Custom JSON must be in dictionary format.")
+        data["json"] = json.dumps(json_data).replace("'", "\\\"")
+        
+        ref_block_num, ref_block_prefix = self.get_reference_block_data()
+        expire = within_range(expire, 5, 120)
+        expiration = _make_expiration(expire)
+        synchronous = true_or_false(synchronous, False)
+
+        operations = [[ "custom_json", data ]]
+        transaction = { "ref_block_num": ref_block_num,
+                     "ref_block_prefix": ref_block_prefix,
+                     "expiration": expiration,
+                     "operations": operations,
+                     "extensions": [] }
+        return self._broadcast(transaction, synchronous)
+
+    def _custom_json(self, custom_json_id, json_data, required_posting_auths, expire=30, synchronous=False):
+        """
+            Provides a generic way to add higher level protocols.
+            
+            :custom_json_id: a valid string in a lowercase snake case form
+            :json_data: any valid JSON data
+            :required_auths: account usernames required to sign with a private key
+            :required_posting_auths: account usernames required to sign with a `posting` private key
+            :roles: account usernames required to sign with a `posting` private key
+        """
+        
+        pass
     
     def _broadcast(self, transaction, synchronous, strict=True):
         method = "condenser_api.broadcast_transaction"

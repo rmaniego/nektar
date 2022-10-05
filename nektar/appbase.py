@@ -171,8 +171,14 @@ class AppBase:
             if op[0] not in BLOCKCHAIN_OPERATIONS:
                 raise NektarException(op[0] + " is unsupported")
             operation = op[0]
+            # avoid unnecessary signatures
+            if operation == "custom_json":
+                if not len(op[1]["required_auths"]):
+                    operation = "posting"
         
+        signatures = []
         if "signatures" in transaction:
+            signatures = transaction["signatures"]
             transaction.pop("transaction", None)
 
         ## serialize transaction and sign with private keys
@@ -183,8 +189,9 @@ class AppBase:
         self._transaction_id = hexlify(hashed[:20]).decode("ascii")
         
         ## update transaction signature
-        wifs = _get_necesarry_wifs(self.wifs, operation)
-        transaction["signatures"] = sign_transaction(self.chain_id, serialized_transaction, wifs)
+        wifs = _get_necessary_wifs(self.wifs, operation)
+        signatures.extend(sign_transaction(self.chain_id, serialized_transaction, wifs))
+        transaction["signatures"] = list(set(signatures))
         
         self.rid += 1
         params = [transaction]
@@ -228,10 +235,10 @@ class AppBase:
 # utils                 #
 #########################
 
-def _get_necesarry_wifs(wifs, operation):
+def _get_necessary_wifs(wifs, operation):
     return [wifs[role]
-                for role in ROLES[operation]
-                    if role in wifs]
+            for role in ROLES[operation]
+                if role in wifs]
 
 def _format_payload(method, params, rid):
     return {

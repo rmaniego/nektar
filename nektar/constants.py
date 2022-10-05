@@ -314,10 +314,15 @@ BLOCKCHAIN_OPERATIONS = [
 
 # HIVE PRIVATE KEY ROLES
 ROLES = {
-        "transfer": ["owner", "active"],
+        "all": ["owner", "active", "posting", "memo"],
         "comment": ["owner", "active", "posting"],
         "vote": ["owner", "active", "posting"],
-        "all": ["owner", "active", "posting", "memo"]
+        "transfer": ["owner", "active"],
+        "custom_json": ["active"],
+        "owner": ["owner"],
+        "active": ["active"],
+        "posting": ["posting"],
+        "memo": ["memo"]
     }
 
 # HIVE ASSETS

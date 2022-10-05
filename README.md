@@ -186,6 +186,16 @@ message = "Sending you some HBDs..."
 hive.memo(receiver, amount, asset, message)
 ```
 
+**Create a Custom JSON (Active Key)** 
+```python
+
+protocol_id = "nektar_admin"
+json_data = { "app": "nektar.app/2022.10.05" }
+required_auths = ["valid-username"]
+required_posting_auths = []
+hive.custom_json(protocol_id, json_data, required_auths, required_posting_auths)
+```
+
 ## AppBase Module
 **Basic Usage**
 ```python
