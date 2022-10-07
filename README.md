@@ -26,6 +26,9 @@ This is compatible with Python 3.9 or later.
 **Import Module**
 ```python
 from nektar import Waggle
+
+# optionally, leverage json to `beautify` dictionaries
+import json
 ```
 
 **Basic Setup**
@@ -63,6 +66,18 @@ hive = Waggle(username, app=app_name, version=version)
 wifs = [ "5*" ]
 
 hive.append_wif(wifs)
+```
+
+**Get Blockchain Constants** 
+
+```python
+# Hive Developer Portal > Understanding Configuration Values
+# https://developers.hive.io/tutorials-recipes/understanding-configuration-values.html
+data = hive.get_config()
+print(json.dumps(data, indent=4))
+    
+data = hive.get_config(field="HIVE_CHAIN_ID", fallback="bee*")
+print("HIVE_CHAIN_ID: " + str(data))
 ```
 
 **Browse Communities** 
@@ -114,6 +129,28 @@ for subscriber in hive.subscribers(community, limit=1000):
 **Search Accounts Starting with a *pattern*** 
 ```python
 accounts = hive.accounts(start="h", limit=1000)
+```
+
+**Get Account `raw` Current Resource Credits** 
+```python
+## resource credit of the initialized account
+data = hive.resource_credits()
+print(json.dumps(data, indent=4))
+
+## specify another account
+data = hive.resource_credits("valid-account")
+print(json.dumps(data, indent=4))
+```
+
+**Get Account Manabar Percentage** 
+```python
+## manabar of the initialized account
+percentage = hive.manabar()
+print("Current Mana: " + str(int(percentage)) + "%")
+
+## specify another account
+percentage = hive.manabar("valid-account")
+print("Current Mana: " + str(int(percentage)) + "%")
 ```
 
 **Get the List of Followers** 

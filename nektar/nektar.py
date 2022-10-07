@@ -41,6 +41,9 @@ class Nektar:
 
         self.account = None
         self.refresh()
+        
+        # lazy mode
+        self.config = None
 
     def set_username(self, username):
         if not isinstance(username, str):
@@ -49,6 +52,54 @@ class Nektar:
 
     def refresh(self):
         self.account = self.appbase.api("condenser").get_accounts([[self.username]])[0]
+
+    def resource_credits(self, account=None):
+        """
+            Get the current resource credits of an account.
+            
+            :account: get followers of an account, default = username (optional)
+        """
+        
+        params = {}
+        if account is None:
+            account = self.username
+        if not isinstance(account, str):
+            raise NektarException("Account must be a string.")
+        pattern = r"[\w][\w\d\.\-]{2,15}"
+        if not len(re.findall(pattern, account)):
+            raise NektarException("Account must be a string of length 3 - 16.")
+        params["accounts"] = [ account ]
+        
+        data = self.appbase.api("rc").find_rc_accounts(params)["rc_accounts"]
+        if not data:
+            return {}
+        return data[0]
+
+    def manabar(self, account=None):
+        """
+            Returns the current manabar precentage.
+            
+            :account: get followers of an account, default = username (optional)
+        """
+        
+        data = self.resource_credits(account)
+        return (int(data["rc_manabar"]["current_mana"]) / int(data["max_rc"])) * 100
+        
+
+    def get_config(self, field=None, fallback=None):
+        """
+            Get low-level blockchain constants.
+            
+            :field: configuration field to get (optional)
+            :fallback: a fallback value if field is not found (optional)
+        """
+        # Hive Developer Portal > Understanding Configuration Values
+        # https://developers.hive.io/tutorials-recipes/understanding-configuration-values.html
+        if self.config is None:
+            self.config = self.appbase.api("database").get_config({})
+        if isinstance(field, str):
+            return self.config.get(field, fallback)
+        return self.config
 
     def get_dynamic_global_properties(self, api="condenser"):
         ## use database_api
@@ -60,7 +111,6 @@ class Nektar:
         return blocks["block"]["previous"]
 
     def get_reference_block_data(self):
-        ## beembase / ledgertransactions
         properties = self.get_dynamic_global_properties("database")
         ref_block_num = properties["head_block_number"] - 3 & 0xFFFF
         previous = self.get_previous_block(properties["head_block_number"])
@@ -146,6 +196,9 @@ class Waggle(Nektar):
         self.version = NEKTAR_VERSION
         if isinstance(version, str):
             self.version = version
+        
+        # lazy mode
+        self.config = None
 
     def communities(self, last=None, sort="rank", limit=100, query=None):
         """
