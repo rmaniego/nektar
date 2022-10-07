@@ -20,7 +20,14 @@ from .appbase import AppBase
 from .constants import NEKTAR_VERSION, ASSETS, ROLES, DATETIME_FORMAT
 from .exceptions import NektarException
 
-class Waggle:
+
+class Nektar:
+    """
+        Nektar Class
+        ~~~~~~~~~
+
+        Base Class to access access AppBase/Condenser API methods.
+    """
     def __init__(self, username, wif=None, role=None, wifs=None, app=None, version=None):
         self.set_username(username)
         
@@ -34,14 +41,6 @@ class Waggle:
 
         self.account = None
         self.refresh()
-        
-        self.app = "nektar"
-        if isinstance(app, str):
-            self.app = app
-        
-        self.version = NEKTAR_VERSION
-        if isinstance(version, str):
-            self.version = version
 
     def set_username(self, username):
         if not isinstance(username, str):
@@ -67,6 +66,86 @@ class Waggle:
         previous = self.get_previous_block(properties["head_block_number"])
         ref_block_prefix = struct.unpack_from("<I", unhexlify(previous), 4)[0]
         return ref_block_num, ref_block_prefix
+
+    def custom_json(self, json_id, json_data, required_auths, required_posting_auths, expire=30, synchronous=False):
+        """
+            Provides a generic way to add higher level protocols.
+            
+            :json_id: a valid string in a lowercase snake case form
+            :json_data: any valid JSON data
+            :required_auths: account usernames required to sign with private keys
+            :required_posting_auths: account usernames required to sign with a `posting` private key
+        """
+    
+        data = {}    
+        roles = "posting" # initial required role
+        
+        if not isinstance(required_auths, list):
+            raise NektarException("The `required_auths` requires a list of valid usernames.")
+        data["required_auths"] = required_auths
+        
+        # if required auths is not empty, include owner,
+        # active and posting roles
+        if len(required_auths):
+            roles = "custom_json"
+        if not _check_wifs(self.roles, roles):
+            raise NektarException("The `custom_json` operation requires" \
+                                    "one of the following private keys:" + ", ".join(ROLES[roles]))
+
+        if not isinstance(required_posting_auths, list):
+            raise NektarException("The `required_posting_auths` requires a list of valid usernames.")
+        data["required_posting_auths"] = required_posting_auths
+        
+        if len(re.findall(r"[^\w]+", json_id)):
+            raise NektarException("Custom JSON id must be a valid string preferrably in lowercase and snake case format.")
+        data["id"] = json_id
+        
+        if not isinstance(json_data, dict):
+            raise NektarException("Custom JSON must be in dictionary format.")
+        data["json"] = json.dumps(json_data).replace("'", "\\\"")
+        
+        ref_block_num, ref_block_prefix = self.get_reference_block_data()
+        expire = within_range(expire, 5, 120, 30)
+        expiration = _make_expiration(expire)
+        synchronous = true_or_false(synchronous, False)
+
+        operations = [[ "custom_json", data ]]
+        transaction = { "ref_block_num": ref_block_num,
+                     "ref_block_prefix": ref_block_prefix,
+                     "expiration": expiration,
+                     "operations": operations,
+                     "extensions": [] }
+        return self._broadcast(transaction, synchronous)
+    
+
+class Waggle(Nektar):
+    """
+        Waggle Class
+        ~~~~~~~~~
+
+        Methods to interact with the Hive Blockchain.
+    """
+    def __init__(self, username, wif=None, role=None, wifs=None, app=None, version=None):
+        self.set_username(username)
+        
+        self.appbase = AppBase()
+        
+        if isinstance(role, str) and isinstance(wif, str):
+            self.appbase.append_wif(role, wif)
+        if isinstance(wifs, dict):
+            self.appbase.append_wif(wifs)
+        self.roles = list(self.appbase.wifs.keys())
+
+        self.account = None
+        self.refresh()
+        
+        self.app = "nektar.waggle"
+        if isinstance(app, str):
+            self.app = app
+        
+        self.version = NEKTAR_VERSION
+        if isinstance(version, str):
+            self.version = version
 
     def communities(self, last=None, sort="rank", limit=100, query=None):
         """
@@ -231,6 +310,104 @@ class Waggle:
             params[1] = results[-1]["follower"]
         return results[:custom_limit]
 
+    def delegators(self, account=None, active=False):
+        """
+            Get all account delegators and other related information.
+            
+            :account: any valid Hive account username, default = initialized username (optional)
+            :active: include all changes in delegations if false (optional)
+        """
+
+        params = ["", -1, 1000, 0]
+
+        params[0] = self.username
+        if isinstance(account, str):
+            params[0] = account
+        
+        operation_id = 40  # delegate_vesting_shares_operation
+        params[3] = int("1".ljust(operation_id+1, "0"), 2)
+        
+        results = {}
+        while True:
+            try:
+                result = self.appbase.api("condenser").get_account_history(params)
+            except:
+                if params[1] == -1:
+                    break
+                params[1] -= 1000
+            for item in result:
+                if params[1] == -1:
+                    params[1] = ((item[0] // 1000) * 1000) - 2000
+                if item[0] < params[1]:
+                    params[1] = ((item[0] // 1000) * 1000) - 1000
+                delegator = item[1]["op"][1]["delegator"]
+                if delegator == self.username:
+                    continue
+                if delegator not in results:
+                    results[delegator] = {}
+                timestamp = item[1]["timestamp"]
+                results[delegator][timestamp] = float(item[1]["op"][1]["vesting_shares"].split(" ")[0])
+            if params[1] < 1000:
+                break
+        if active:
+            active_delegations = {}
+            for d, data in results.items():
+                recent = max(list(data.keys()))
+                vesting = data[recent]
+                if vesting:
+                    active_delegations[d] = vesting
+            return active_delegations
+        return results
+
+    def delegatees(self, account=None, active=False):
+        """
+            Get all account delegatees and other related information.
+            
+            :account: any valid Hive account username, default = initialized username (optional)
+            :active: include all changes in delegations if false (optional)
+        """
+
+        params = ["", -1, 1000, 0]
+
+        params[0] = self.username
+        if isinstance(account, str):
+            params[0] = account
+        
+        operation_id = 40  # delegate_vesting_shares_operation
+        params[3] = int("1".ljust(operation_id+1, "0"), 2)
+        
+        results = {}
+        while True:
+            try:
+                result = self.appbase.api("condenser").get_account_history(params)
+            except:
+                if params[1] == -1:
+                    break
+                params[1] -= 1000
+            for item in result:
+                if params[1] == -1:
+                    params[1] = ((item[0] // 1000) * 1000) - 2000
+                if item[0] < params[1]:
+                    params[1] = ((item[0] // 1000) * 1000) - 1000
+                delegatee = item[1]["op"][1]["delegatee"]
+                if delegatee == self.username:
+                    continue
+                if delegatee not in results:
+                    results[delegatee] = {}
+                timestamp = item[1]["timestamp"]
+                results[delegatee][timestamp] = float(item[1]["op"][1]["vesting_shares"].split(" ")[0])
+            if params[1] < 1000:
+                break
+        if active:
+            active_delegations = {}
+            for d, data in results.items():
+                recent = max(list(data.keys()))
+                vesting = data[recent]
+                if vesting:
+                    active_delegations[d] = vesting
+            return active_delegations
+        return results
+
     def posts(self, community=None, sort="created", paidout=None, limit=100):
         """
             Get ranked posts based on tag.
@@ -270,7 +447,7 @@ class Waggle:
         """
             Lists posts related to a given account.
             
-            :acount: any valid account, default = set username (optional)
+            :account: any valid account, default = set username (optional)
             :sort: sort by `blog`, `feed`, `post`, `replies`, or `payout`
             :limit: maximum limit of posts
         """
@@ -517,43 +694,84 @@ class Waggle:
                      "operations": operations,
                      "extensions": [] }
         return self._broadcast(transaction, synchronous)
-
-    def custom_json(self, protocol_id, json_data, required_auths, required_posting_auths, expire=30, synchronous=False):
-        """
-            Provides a generic way to add higher level protocols.
-            
-            :protocol_id: a valid string in a lowercase snake case form
-            :json_data: any valid JSON data
-            :required_auths: account usernames required to sign with private keys
-            :required_posting_auths: account usernames required to sign with a `posting` private key
-        """
     
-        data = {}    
-        roles = "posting" # initial required role
-        
-        if not isinstance(required_auths, list):
-            raise NektarException("The `required_auths` requires a list of valid usernames.")
-        data["required_auths"] = required_auths
-        
-        # if required auths is not empty, include owner,
-        # active and posting roles
-        if len(required_auths):
-            roles = "custom_json"
-        if not _check_wifs(self.roles, roles):
-            raise NektarException("The `custom_json` operation requires" \
-                                    "one of the following private keys:" + ", ".join(ROLES[roles]))
+    def _broadcast(self, transaction, synchronous, strict=True):
+        method = "condenser_api.broadcast_transaction"
+        if synchronous:
+            method = "condenser_api.broadcast_transaction_synchronous"
+            result = self.appbase.broadcast(method, transaction, strict)
+            if result:
+                return result
+        return self.appbase.broadcast(method, transaction, strict)
 
-        if not isinstance(required_posting_auths, list):
-            raise NektarException("The `required_posting_auths` requires a list of valid usernames.")
-        data["required_posting_auths"] = required_posting_auths
+
+class Swarm(Nektar):
+    """
+        Swarm Class
+        ~~~~~~~~~
+
+        Wrapped methods for admins and moderators to manage communities.
+    """
+    def __init__(self, community, username, wif=None, role=None, wifs=None, app=None, version=None):
+        self.set_username(username)
         
-        if len(re.findall(r"[^\w]+", protocol_id)):
-            raise NektarException("Custom JSON id must be a valid string preferrably in lowercase and snake case format.")
-        data["id"] = protocol_id
+        self.appbase = AppBase()
         
-        if not isinstance(json_data, dict):
-            raise NektarException("Custom JSON must be in dictionary format.")
-        data["json"] = json.dumps(json_data).replace("'", "\\\"")
+        if isinstance(role, str) and isinstance(wif, str):
+            self.appbase.append_wif(role, wif)
+        if isinstance(wifs, dict):
+            self.appbase.append_wif(wifs)
+        self.roles = list(self.appbase.wifs.keys())
+
+        self.account = None
+        self.refresh()
+        
+        self.app = "nektar.swarm"
+        if isinstance(app, str):
+            self.app = app
+        
+        self.version = NEKTAR_VERSION
+        if isinstance(version, str):
+            self.version = version
+
+        self._community = community
+        if not len(re.findall(r"\bhive-[\d]{1,6}\b", community)):
+            raise NektarException("Community must be a valid community name in `hive-*` format.")
+
+        self._required_posting_auths = [self.username]
+
+    def mute(self, author, permlink, notes):
+        """
+            Mute posts or comments with a designated note.
+
+            :author: username of author of the blog post being replied to.
+            :permlink: permlink to the blog post being muted.
+            :notes: reason for muting.
+        """
+
+        if not isinstance(author, str):
+            raise NektarException("Username must be a valid Hive account username.")
+        author = author.replace("@", "")
+        
+        pattern = r"[\w][\w\d\-\%]{0,255}"
+        if not len(re.findall(pattern, permlink)):
+            raise NektarException("The permlink must be a valid url-escaped string.")
+
+        if not isinstance(notes, str):
+            raise NektarException("Notes must be in string format.")
+        
+        data = {}
+        data["required_auths"] = []
+        data["required_posting_auths"] = [self.username]
+        data["id"] = "community"
+        
+        json_data = {}
+        json_data["community"] = self._community
+        json_data["account"] = author
+        json_data["permlink"] = permlink
+        json_data["notes"] = notes
+        operation = [ "mutePost", json_data ]
+        data["json"] = json.dumps(operation).replace("'", "\\\"")
         
         ref_block_num, ref_block_prefix = self.get_reference_block_data()
         expire = within_range(expire, 5, 120, 30)
@@ -566,29 +784,16 @@ class Waggle:
                      "expiration": expiration,
                      "operations": operations,
                      "extensions": [] }
-        return self._broadcast(transaction, synchronous)
+        print(transaction)
+        # return self._broadcast(transaction, synchronous)
 
-    def _custom_json(self, custom_json_id, json_data, required_posting_auths, expire=30, synchronous=False):
+    def mark_spam(self, author, permlink):
         """
-            Provides a generic way to add higher level protocols.
-            
-            :custom_json_id: a valid string in a lowercase snake case form
-            :json_data: any valid JSON data
-            :required_auths: account usernames required to sign with a private key
-            :required_posting_auths: account usernames required to sign with a `posting` private key
-            :roles: account usernames required to sign with a `posting` private key
+            Muting post but noted as `spam` as standardized label for spams.
         """
+        self.mute(author, permlink, "spam")
         
-        pass
     
-    def _broadcast(self, transaction, synchronous, strict=True):
-        method = "condenser_api.broadcast_transaction"
-        if synchronous:
-            method = "condenser_api.broadcast_transaction_synchronous"
-            result = self.appbase.broadcast(method, transaction, strict)
-            if result:
-                return result
-        return self.appbase.broadcast(method, transaction, strict)
 
 ##############################
 # utils                      #

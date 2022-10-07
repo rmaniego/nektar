@@ -116,7 +116,7 @@ for subscriber in hive.subscribers(community, limit=1000):
 accounts = hive.accounts(start="h", limit=1000)
 ```
 
-**Get a List of Followers** 
+**Get the List of Followers** 
 ```python
 
 ## followers of the initialized account
@@ -126,6 +126,54 @@ print(followers)
 ## or using a valid account username
 followers = hive.followers(account="valid-username")
 print(followers)
+```
+
+**Get the List of Delegators** 
+```python
+
+## followers of the initialized account
+delegators = hive.delegators()
+for delegator, data in delegators.items():
+    print(delegator)
+    for dt, vests in data.items():
+        print(dt, vests)
+
+
+## or using a valid account username
+delegators = hive.delegators("valid-username")
+for delegator, data in delegators.items():
+    print(delegator)
+    for dt, vests in data.items():
+        print(dt, vests)
+
+## only show active delegations
+delegators = hive.delegators(active=True)
+for delegator, vests in delegators.items():
+    print(delegator, vests)
+```
+
+**Get the List of Delegatees** 
+```python
+
+## followers of the initialized account
+delegatees = hive.delegatees()
+for delegatee, data in delegatees.items():
+    print(delegatee)
+    for dt, vests in data.items():
+        print(dt, vests)
+
+
+## or using a valid account username
+delegatees = hive.delegatees("valid-username")
+for delegatee, data in delegatees.items():
+    print(delegatee)
+    for dt, vests in data.items():
+        print(dt, vests)
+
+## only show active delegations
+delegatees = hive.delegatees(active=True)
+for delegatee, vests in delegatees.items():
+    print(delegatee, vests)
 ```
 
 **Get Blog Posts** 
