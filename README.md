@@ -192,6 +192,22 @@ for blog in blogs:
         print(key + ":", value)
 ```
 
+**Access a Blog Post/Comment** 
+If the post or comment does not exists in the blockchain, it will return an empty dictionary.
+```python
+
+author = "valid-username"
+permlink = "valid-permlink"
+data = hive.get_post(author, permlink)
+print(json.dumps(data, indent=4))
+    
+author = "valid-username"
+permlink = "test-permlink-abc-123-def-456"
+data = hive.get_post(author, permlink, retries=5)
+if not data:
+    print("The post is not yet in the blockchain.")
+```
+
 **Create a Post Programmatically** 
 
 ***WARNING:*** Do NOT abuse Hive, post only quality contents not more than once a day.

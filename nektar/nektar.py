@@ -475,6 +475,43 @@ class Waggle(Nektar):
                 results.append(post)
         return results
 
+    def get_post(self, author, permlink, retries=1):
+        """
+            Get the current data of a post, if not found returns empty dictionary.
+            
+            :author: username of author of the blog post being accessed
+            :permlink: permlink to the blog post being accessed
+            :retries: number of times to check the existence of the post, must be between 1-5 (Optional)
+        """
+
+        params = {}
+        if not isinstance(author, str):
+            raise NektarException("Author must be a string.")
+        pattern = r"[\w][\w\d\.\-]{2,15}"
+        if not len(re.findall(pattern, author)):
+            raise NektarException("author must be a string of length 3 - 16.")
+        params["author"] = author
+        pattern = r"[\w][\w\d\-\%]{0,255}"
+        if not len(re.findall(pattern, permlink)):
+            raise NektarException("permlink must be a valid url-escaped string.")
+        params["permlink"] = permlink
+        params["observer"] = self.username
+        
+        if not isinstance(retries, int):
+            raise NektarException("Retries must be an integer.")
+        if not (1 <= retries <= 5):
+            raise NektarException("Retries must be between 1 to 5 times.")
+        
+        for _ in range(retries):
+            try:
+                data = self.appbase.api("bridge").get_post(params)
+                if len(data):
+                    return data
+            except:
+                pass
+        return {}
+                
+
     def new_post(self, title, body, description=None, tags=None, community=None, expire=30, synchronous=False):
         """
             Create a new post.
@@ -618,7 +655,7 @@ class Waggle(Nektar):
                                     "one of the following private keys:" + ", ".join(ROLES["vote"]))
         
         if not isinstance(author, str):
-            raise NektarException("author must be a string.")
+            raise NektarException("Author must be a string.")
 
         pattern = r"[\w][\w\d\.\-]{2,15}"
         match = re.findall(pattern, author)
