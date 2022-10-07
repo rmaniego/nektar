@@ -1,7 +1,7 @@
 ![](/resources/banner.png)
 
 # nektar
-nektar allows communication to the Hive blockchain using the Hive API.
+**[![](https://images.hive.blog/20x20/https://images.ecency.com/DQmQBYsZc8G6awKZcVbonRsJBUWJ1HTZy3WuTaMXvBreyhj/4511507.png) Nektar](#) allows communication to the Hive blockchain using the Hive API.
 
 ## Official Release
 **nektar** can now be used on your Python projects through PyPi by running pip command on a Python-ready environment.

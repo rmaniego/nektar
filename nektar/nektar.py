@@ -48,7 +48,7 @@ class Nektar:
         self.username = username.replace("@", "")
 
     def refresh(self):
-        self.account = self.appbase.api("condenser").get_accounts([[self.username]])
+        self.account = self.appbase.api("condenser").get_accounts([[self.username]])[0]
 
     def get_dynamic_global_properties(self, api="condenser"):
         ## use database_api
@@ -655,7 +655,7 @@ class Waggle(Nektar):
         """
         
         if not _check_wifs(self.roles, "transfer"):
-            raise NektarException("The `comment` operation requires" \
+            raise NektarException("The `transfer` operation requires" \
                                     "one of the following private keys:" + ", ".join(ROLES["transfer"]))
     
         data = {}
@@ -673,8 +673,10 @@ class Waggle(Nektar):
         if asset not in ("HBD", "HIVE"):
             raise NektarException("Memo only accepts transfer of HBD and HIVE assets.")
         
-        amount = round(amount, ASSETS[asset]["precision"])
-        data["amount"] = str(amount) + " " + asset
+        precision = ASSETS[asset]["precision"]
+        whole, fraction = str(float(amount)).split(".")
+        fraction = fraction.ljust(precision, "0")[:precision]
+        data["amount"] = whole + "." + fraction + " " + asset
         
         if not isinstance(message, str):
             raise NektarException("Memo message must be a UTF-8 string.")
@@ -693,6 +695,7 @@ class Waggle(Nektar):
                      "expiration": expiration,
                      "operations": operations,
                      "extensions": [] }
+
         return self._broadcast(transaction, synchronous)
     
     def _broadcast(self, transaction, synchronous, strict=True):
