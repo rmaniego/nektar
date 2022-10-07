@@ -1,7 +1,7 @@
 ![](/resources/banner.png)
 
 # nektar
-**[![](https://images.hive.blog/20x20/https://images.ecency.com/DQmQBYsZc8G6awKZcVbonRsJBUWJ1HTZy3WuTaMXvBreyhj/4511507.png) Nektar](#) allows communication to the Hive blockchain using the Hive API.
+[![](https://images.hive.blog/20x20/https://images.ecency.com/DQmQBYsZc8G6awKZcVbonRsJBUWJ1HTZy3WuTaMXvBreyhj/4511507.png) Nektar](#) allows communication to the Hive blockchain using the Hive API.
 
 ## Official Release
 **nektar** can now be used on your Python projects through PyPi by running pip command on a Python-ready environment.
@@ -97,7 +97,15 @@ for sort in sorting:
 ```
 
 **Get Posts in a Community** 
-Get posts in a community by sorting filter `created`, `trending`, `hot`, `promoted`, `payout`, `payout_comments`, or `muted`.
+Get posts in a community by sorting filter:
+ - `created`
+ - `trending`
+ - `hot`
+ - `promoted`
+ - `payout`
+ - `payout_comments`
+ - `muted`
+
 ```python
 
 community = "hive-1*"  # supply with a valid community name
@@ -108,7 +116,15 @@ print(posts[0]["title"])
 ```
 
 **Get Posts with a Tag** 
-Get posts in a community by sorting filter: `created`, `trending`, `hot`, `promoted`, `payout`, `payout_comments`, or `muted`.
+Get posts in a community by sorting filter:
+ - `created`
+ - `trending`
+ - `hot`
+ - `promoted`
+ - `payout`
+ - `payout_comments`
+ - `muted`.
+
 ```python
 tag = "nature"
 posts = hive.posts(tag, limit=10, sort="created")
@@ -214,7 +230,13 @@ for delegatee, vests in delegatees.items():
 ```
 
 **Get Blog Posts** 
-Get posts of an account by sorting filter: `blog`, `feed`, `post`, `replies`, or `payout`
+Get posts of an account by sorting filter:
+ - `blog`
+ - `feed`
+ - `post`
+ - `replies`
+ - `payout`
+
 ```python
 ## blog posts of the initialized account
 blogs = hive.blogs(limit=10)
