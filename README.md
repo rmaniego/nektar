@@ -27,7 +27,7 @@ This is compatible with Python 3.9 or later.
 ```python
 from nektar import Waggle
 
-# optionally, leverage json to `beautify` dictionaries
+# leverage json to `beautify` purpose only
 import json
 ```
 
@@ -57,15 +57,19 @@ hive = Waggle(username, app=app_name, version=version)
 ***WARNING:*** Store WIFs securely in a separate file!
 ```python
 
+## option 1
+wif = "5*"
+role="posting"
 username = "hive-nektar"
-app_name = "nektar.app"
-version = "2022.10.05"
 
-hive = Waggle(username, app=app_name, version=version)
+hive = Waggle(username, wif=wif, role=role)
 
-wifs = [ "5*" ]
+## option 2
+username = "hive-nektar"
 
-hive.append_wif(wifs)
+wifs = { "acive": "5*" }
+hive = Waggle(username, wifs=wifs)
+
 ```
 
 **Get Blockchain Constants** 
@@ -179,6 +183,23 @@ print(followers)
 ## or using a valid account username
 followers = hive.followers(account="valid-username")
 print(followers)
+```
+
+**Get List of Account History** 
+```python
+    
+# up to 1000 operations, most recent first
+transactions = hive.history()
+print("Transactions:", json.dumps(transactions[1], indent=4))
+
+# up to 1000 upvote operations of another acount
+transactions = hive.history(account="oniemaniego", start=1000, low=0)
+print("Transactions:", json.dumps(transactions[1], indent=4))
+    
+# up to 100 operations of another acount
+transactions = hive.history(account="oniemaniego", start=1000, limit=100)
+for transaction in transactions[:1]:
+    print(transaction[0], transaction[1]["op"])
 ```
 
 **Get the List of Delegators** 

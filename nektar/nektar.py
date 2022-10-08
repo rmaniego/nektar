@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from binascii import hexlify, unhexlify
 
 from .appbase import AppBase
-from .constants import NEKTAR_VERSION, ASSETS, ROLES, DATETIME_FORMAT
+from .constants import NEKTAR_VERSION, BLOCKCHAIN_OPERATIONS, ASSETS, ROLES, DATETIME_FORMAT
 from .exceptions import NektarException
 
 
@@ -362,6 +362,44 @@ class Waggle(Nektar):
                 break
             params[1] = results[-1]["follower"]
         return results[:custom_limit]
+
+    def history(self, account=None, start=-1, limit=1000, low=None, high=None):
+        """
+            Get all account delegators and other related information.
+            
+            :account: any valid Hive account username, default = initialized username (optional)
+            :start: upperbound range, or -1 for reverse history (optional)
+            :limit: upperbound range, or -1 for reverse history (optional)
+        """
+        
+        params = [self.username]
+        if isinstance(account, str):
+            params[0] = account
+
+        if not isinstance(start, int):
+            raise NektarException("Start must be an integer.")
+        if not (start == -1 or start > 999):
+            raise NektarException("Start be `-1` or an upperbound of value 1000 or higher.")
+        params.append(start)
+
+        limit = within_range(limit, 1, 1000, 1000)
+        params.append(limit)
+        
+        operations = list(range(len(BLOCKCHAIN_OPERATIONS)))
+        if isinstance(low, int):
+            ## for the first 64 blockchain operation
+            if low not in operations:
+                raise NektarException("Operation Filter `low` is not a valid blockchain operation ID.")
+            params.append(int("1".ljust(low+1, "0"), 2))
+
+        if isinstance(high, int):
+            ## for the next 64 blockchain operation
+            if high not in operations:
+                raise NektarException("Operation Filter `high` is not a valid blockchain operation ID.")
+            params.append(0) # set to `operation_filter_low` zero
+            params.append(int("1".ljust(high+1, "0"), 2))
+        
+        return self.appbase.api("condenser").get_account_history(params)
 
     def delegators(self, account=None, active=False):
         """
