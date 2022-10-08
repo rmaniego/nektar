@@ -53,6 +53,7 @@ class AppBase:
         self.wifs = {}
         self.chain_id = self.api("database").get_version({})["chain_id"]
         self._transaction_id = None
+        self.signed_transaction = None
     
     def custom_nodes(self, nodes):
         """
@@ -137,7 +138,9 @@ class AppBase:
         if "strict" in kwargs:
             strict = kwargs["strict"]
         
+        ## do not change sorting order !!
         broadcast_methods = [
+            "condenser_api.verify_authority",
             "condenser_api.broadcast_transaction",
             "condenser_api.broadcast_transaction_synchronous",
             "database_api.get_potential_signatures",
@@ -146,13 +149,14 @@ class AppBase:
             "database_api.verify_authority",
             "network_broadcast_api.broadcast_transaction"
         ]
-        
-        if params in broadcast_methods:
-            params = [params]
-            if method in broadcast_methods[2:]:
-                params = { "trx": params[0] }
+
         if method in broadcast_methods:
-            return broadcast(method, params)
+            params = [params]
+            if method in broadcast_methods[3:]:
+                params = { "trx": params[0] }
+
+        if method in broadcast_methods[1:]:
+            return self.broadcast(method, params)
         return self.request(method, params)
 
     def request(self, method, params):
@@ -164,7 +168,7 @@ class AppBase:
         return self._send_request(payload)
         
 
-    def broadcast(self, method, transaction, strict=True):
+    def broadcast(self, method, transaction, strict=True, verify_only=False):
         ## check if operations are valid
         operation = ""
         for op in transaction["operations"]:
@@ -192,12 +196,20 @@ class AppBase:
         wifs = _get_necessary_wifs(self.wifs, operation)
         signatures.extend(sign_transaction(self.chain_id, serialized_transaction, wifs))
         transaction["signatures"] = list(set(signatures))
+        self.signed_transaction = transaction
+        
+        verified = self.api("condenser").verify_authority(transaction)
+        if strict and not verified:
+            raise NektarException("Transaction does not contain required signatures.")
+        if verify_only:
+            return verified
         
         self.rid += 1
         params = [transaction]
         payload = _format_payload(method, params, self.rid)
         result = self._send_request(payload, strict)
         if method == "condenser_api.broadcast_transaction" and not strict:
+            ## not working
             return self.api("condenser_api").get_transaction([transaction_id])
         return result
 

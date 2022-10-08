@@ -1,7 +1,7 @@
 ![](/resources/banner.png)
 
 # nektar
-[![](https://images.hive.blog/20x20/https://images.ecency.com/DQmQBYsZc8G6awKZcVbonRsJBUWJ1HTZy3WuTaMXvBreyhj/4511507.png) Nektar](#) allows communication to the Hive blockchain using the Hive API.
+[![](https://images.hive.blog/20x20/https://images.ecency.com/DQmQBYsZc8G6awKZcVbonRsJBUWJ1HTZy3WuTaMXvBreyhj/4511507.png) Nektar](#) a Hive API SDK for Python.
 
 ## Official Release
 **nektar** can now be used on your Python projects through PyPi by running pip command on a Python-ready environment.
@@ -310,6 +310,16 @@ community = "hive-1*"  # use a valid community name
 hive.new_post(title, body, description, tags, community)
 ```
 
+**Reply to a Post** 
+***WARNING:*** Do NOT abuse Hive, do not create spam comments.
+```python
+
+author = "valid-username"
+permlink = "valid-permlink"
+body = "Allows markdown formatted text."
+hive.reply(author, permlink, body)
+```
+
 **Vote on A Post** 
 ```python
 
@@ -338,6 +348,28 @@ json_data = { "app": "nektar.app/2022.10.05" }
 required_auths = ["valid-username"]
 required_posting_auths = []
 hive.custom_json(protocol_id, json_data, required_auths, required_posting_auths)
+```
+
+**Check if Transaction has the Neccessary Auths** 
+Will only check if the necessary WIF has signed the transaction, will not broadcast it.
+This is also available in `post`, `reply`, `vote`, and `memo` methods.
+```python
+protocol_id = "nektar_admin"
+json_data = { "app": "nektar.app/2022.10.05" }
+required_auths = ["valid-username"]
+required_posting_auths = []
+hive.custom_json(protocol_id, json_data, required_auths, required_posting_auths, verify_only=True)
+```
+
+**Check if a Custom Transaction has the Necessary Signatures** 
+Will only check if the necessary WIF has signed the transaction, will not broadcast it.
+This is also available in `post`, `reply`, `vote`, and `memo` methods.
+```python
+
+signed_transaction = [ { "ref_block_num": 0, "ref_block_prefix": 0, "expiration": "1970-01-01T00:00:00", "operations": [], "extensions": [], "signatures": [] }]
+
+verified = hive.verify_authority(signed_transaction)
+print("OK:", verified)
 ```
 
 ## AppBase Module

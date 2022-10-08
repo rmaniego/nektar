@@ -117,7 +117,7 @@ class Nektar:
         ref_block_prefix = struct.unpack_from("<I", unhexlify(previous), 4)[0]
         return ref_block_num, ref_block_prefix
 
-    def custom_json(self, json_id, json_data, required_auths, required_posting_auths, expire=30, synchronous=False):
+    def custom_json(self, json_id, json_data, required_auths, required_posting_auths, expire=30, synchronous=False, strict=True, verify_only=False):
         """
             Provides a generic way to add higher level protocols.
             
@@ -199,6 +199,9 @@ class Waggle(Nektar):
         
         # lazy mode
         self.config = None
+        
+        # most recent transactions
+        self.transaction = None
 
     def communities(self, last=None, sort="rank", limit=100, query=None):
         """
@@ -601,9 +604,8 @@ class Waggle(Nektar):
             except:
                 pass
         return {}
-                
 
-    def new_post(self, title, body, description=None, tags=None, community=None, expire=30, synchronous=False):
+    def new_post(self, title, body, description=None, tags=None, community=None, expire=30, synchronous=False, strict=True, verify_only=False):
         """
             Create a new post.
             
@@ -672,6 +674,8 @@ class Waggle(Nektar):
         expiration = _make_expiration(expire)
         expire = within_range(expire, 5, 120, 30)
         synchronous = true_or_false(synchronous, False)
+        strict = true_or_false(strict, True)
+        verify_only = true_or_false(verify_only, False)
 
         operations = [[ "comment", data ]]
         transaction = { "ref_block_num": ref_block_num,
@@ -679,9 +683,9 @@ class Waggle(Nektar):
                      "expiration": expiration,
                      "operations": operations,
                      "extensions": [] }
-        return self._broadcast(transaction, synchronous)
+        return self._broadcast(transaction, synchronous, strict, verify_only)
 
-    def reply(self, author, permlink, body, expire=30, synchronous=False):
+    def reply(self, author, permlink, body, expire=30, synchronous=False, strict=True, verify_only=False):
         """
             Create a new comment to a post.
             
@@ -723,6 +727,8 @@ class Waggle(Nektar):
         expiration = _make_expiration(expire)
         expire = within_range(expire, 5, 120, 30)
         synchronous = true_or_false(synchronous, False)
+        strict = true_or_false(strict, True)
+        verify_only = true_or_false(verify_only, False)
 
         operations = [[ "comment", data ]]
         transaction = { "ref_block_num": ref_block_num,
@@ -730,14 +736,19 @@ class Waggle(Nektar):
                      "expiration": expiration,
                      "operations": operations,
                      "extensions": [] }
-        return self._broadcast(transaction, synchronous)
+        return self._broadcast(transaction, synchronous, strict, verify_only)
 
-    def vote(self, author, permlink, weight, expire=30, synchronous=False, strict=True):
+    def vote(self, author, permlink, weight=10000, percent=None, expire=30, synchronous=False, strict=True, verify_only=False):
         """
             Looks up accounts starting with name.
             
-            :start: starting part of username to search
-            :limit: maximum limit of accounts to list.
+            :author: author of the post or comment being voted
+            :permlink: permlink of the post or comment being voted
+            :weight: vote value between -10000 to 10000 (Optional)
+            :percent: override weight with precentage (Optional)
+            :expire: transaction expiration in seconds (Optional)
+            :synchronous: broadcast transaction synchronously (Optional)
+            :strict: verify authority and raise exception on errors (Optional)
         """
         
         
@@ -763,6 +774,8 @@ class Waggle(Nektar):
         expire = within_range(expire, 5, 120, 30)
         expiration = _make_expiration(expire)
         synchronous = true_or_false(synchronous, False)
+        strict = true_or_false(strict, True)
+        verify_only = true_or_false(verify_only, False)
 
         operations = [[ "vote", { "voter": self.username, "author": author, "permlink": permlink, "weight": weight } ]]
         transaction = { "ref_block_num": ref_block_num,
@@ -770,9 +783,9 @@ class Waggle(Nektar):
                      "expiration": expiration,
                      "operations": operations,
                      "extensions": [] }
-        return self._broadcast(transaction, synchronous, strict)
+        return self._broadcast(transaction, synchronous, strict, verify_only)
 
-    def memo(self, receiver, amount, asset, message, expire=30, synchronous=False):
+    def memo(self, receiver, amount, asset, message, expire=30, synchronous=False, strict=True, verify_only=False):
         """
             Transfers asset from one account to another.
             
@@ -816,6 +829,8 @@ class Waggle(Nektar):
         expire = within_range(expire, 5, 120, 30)
         expiration = _make_expiration(expire)
         synchronous = true_or_false(synchronous, False)
+        strict = true_or_false(strict, True)
+        verify_only = true_or_false(verify_only, False)
 
         operations = [[ "transfer", data ]]
         transaction = { "ref_block_num": ref_block_num,
@@ -824,16 +839,24 @@ class Waggle(Nektar):
                      "operations": operations,
                      "extensions": [] }
 
-        return self._broadcast(transaction, synchronous)
+        return self._broadcast(transaction, synchronous, strict, verify_only)
     
-    def _broadcast(self, transaction, synchronous, strict=True):
+    def _broadcast(self, transaction, synchronous, strict=True, verify_only=False):
         method = "condenser_api.broadcast_transaction"
         if synchronous:
             method = "condenser_api.broadcast_transaction_synchronous"
-            result = self.appbase.broadcast(method, transaction, strict)
+            result = self.appbase.broadcast(method, transaction, strict, verify_only)
             if result:
                 return result
-        return self.appbase.broadcast(method, transaction, strict)
+        return self.appbase.broadcast(method, transaction, strict, verify_only)
+    
+    def verify_authority(self, transaction):
+        """
+            Returns true if the transaction has all of the required signatures.
+            
+            :transaction: a valid transaction data
+        """
+        return self.appbase.api("condenser").verify_authority(transaction, strict=False)
 
 
 class Swarm(Nektar):
@@ -908,6 +931,8 @@ class Swarm(Nektar):
         expire = within_range(expire, 5, 120, 30)
         expiration = _make_expiration(expire)
         synchronous = true_or_false(synchronous, False)
+        strict = true_or_false(strict, True)
+        verify_only = true_or_false(verify_only, False)
 
         operations = [[ "custom_json", data ]]
         transaction = { "ref_block_num": ref_block_num,
@@ -915,8 +940,7 @@ class Swarm(Nektar):
                      "expiration": expiration,
                      "operations": operations,
                      "extensions": [] }
-        print(transaction)
-        # return self._broadcast(transaction, synchronous)
+        return self._broadcast(transaction, synchronous, strict, verify_only)
 
     def mark_spam(self, author, permlink):
         """
