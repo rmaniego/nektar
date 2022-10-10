@@ -16,7 +16,7 @@
 NEKTAR_VERSION = "0.1.0"
 
 # PublicKey prefix
-PREFIX = "STM" 
+PREFIX = "STM"
 
 """
     AppBase APIs and methods
@@ -286,7 +286,7 @@ BLOCKCHAIN_OPERATIONS = [
     "account_update2",
     "create_proposal",
     "update_proposal_votes",
-    "remove_proposal",    
+    "remove_proposal",
     "fill_convert_request",
     "author_reward",
     "curation_reward",
@@ -314,22 +314,22 @@ BLOCKCHAIN_OPERATIONS = [
 
 # HIVE PRIVATE KEY ROLES
 ROLES = {
-        "all": ["owner", "active", "posting", "memo"],
-        "comment": ["owner", "active", "posting"],
-        "vote": ["owner", "active", "posting"],
-        "transfer": ["owner", "active"],
-        "custom_json": ["active"],
-        "owner": ["owner"],
-        "active": ["active"],
-        "posting": ["posting"],
-        "memo": ["memo"]
-    }
+    "all": ["owner", "active", "posting", "memo"],
+    "comment": ["owner", "active", "posting"],
+    "vote": ["owner", "active", "posting"],
+    "transfer": ["owner", "active"],
+    "custom_json": ["active"],
+    "owner": ["owner"],
+    "active": ["active"],
+    "posting": ["posting"],
+    "memo": ["memo"],
+}
 
 # HIVE ASSETS
 ASSETS = {
     "HBD": {"nai": "@@000000013", "precision": 3},
     "HIVE": {"nai": "@@000000021", "precision": 3},
-    "VESTS": {"nai": "@@000000037", "precision": 6}
+    "VESTS": {"nai": "@@000000037", "precision": 6},
 }
 
 # Blockchain Transaction Expiration Format in UTC
@@ -340,16 +340,18 @@ DATETIME_FORMAT = "%Y-%m-%dT%H:%M:%S%Z"
     Nodes availability and reliability may change.
     Custom nodes may be specified to override these options.
 """
-NODES = [   "api.hive.blog",
-            "api.openhive.network",
-            "anyx.io",
-            "hived.privex.io",
-            "rpc.ausbit.dev",
-            "techcoderx.com",
-            "rpc.ecency.com",
-            "hive.roelandp.nl",
-            "hived.emre.sh",
-            "api.deathwing.me",
-            "api.c0ff33a.uk",
-            "hive-api.arcange.eu",
-            "api.pharesim.me" ]
+NODES = [
+    "api.hive.blog",
+    "api.openhive.network",
+    "anyx.io",
+    "hived.privex.io",
+    "rpc.ausbit.dev",
+    "techcoderx.com",
+    "rpc.ecency.com",
+    "hive.roelandp.nl",
+    "hived.emre.sh",
+    "api.deathwing.me",
+    "api.c0ff33a.uk",
+    "hive-api.arcange.eu",
+    "api.pharesim.me",
+]

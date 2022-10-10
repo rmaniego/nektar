@@ -10,6 +10,7 @@
 """
 
 import json
+import logging
 import hashlib
 import requests
 from collections import OrderedDict
@@ -21,12 +22,17 @@ from .transactions import sign_transaction, as_bytes
 from .constants import NEKTAR_VERSION, NODES, APPBASE_API, BLOCKCHAIN_OPERATIONS, ROLES
 from .exceptions import NektarException
 
+logging.basicConfig(
+    filename="nektar.log",
+    filemode="a+",
+    format="%(name)s - %(levelname)s - %(message)s",
+)
+
+
 class AppBase:
-    def __init__(self,
-                    nodes=None,
-                    api=None,
-                    timeout=10,
-                    retries=3):
+    """ """
+
+    def __init__(self, nodes=None, api=None, timeout=10, retries=3):
 
         # set default to condenser api
         self._appbase_api = self.api(api)
@@ -40,24 +46,31 @@ class AppBase:
         # set session timeout
         self.timeout = 10
         self.set_timeout(timeout)
-        
+
         # initialize session
         self.session = requests.Session()
-        max_retries = Retry(total=self.retries, backoff_factor=0.5, status_forcelist=[502, 503, 504])
+        max_retries = Retry(
+            total=self.retries, backoff_factor=0.5, status_forcelist=[502, 503, 504]
+        )
         self.session.mount("http://", HTTPAdapter(max_retries=max_retries))
-        self.headers = { "User-Agent": f"Nektar v{NEKTAR_VERSION}", "content-type": "application/json; charset=utf-8" }
-        
+        self.headers = {
+            "User-Agent": f"Nektar v{NEKTAR_VERSION}",
+            "content-type": "application/json; charset=utf-8",
+        }
+
         self.nodes = NODES
         self.custom_nodes(nodes)
-        
+
         self.wifs = {}
         self.chain_id = self.api("database").get_version({})["chain_id"]
         self._transaction_id = None
         self.signed_transaction = None
-    
+
     def custom_nodes(self, nodes):
-        """
-            Replace known nodes with custom nodes.
+        """Replace known nodes with custom nodes.
+
+        :param nodes:
+
         """
         if nodes is None:
             return
@@ -65,7 +78,7 @@ class AppBase:
             nodes = [nodes]
         self.node = []
         for node in nodes:
-            patterns = [ r"http[s]{0,1}\:[\/]{2}", r"[\/][\w\W]+" ]
+            patterns = [r"http[s]{0,1}\:[\/]{2}", r"[\/][\w\W]+"]
             for pattern in patterns:
                 node = re.sub(pattern, "", node)
             if not len(node):
@@ -73,13 +86,13 @@ class AppBase:
             self.nodes.append(node)
 
     def append_wif(self, role, wif=None):
-        """
-            Append WIF and the associated role of it for signing transactions.
-            
-            If `wif` is empty, role is expected to be a dictionary containing a valid role-wif pairs.
-            
-            :role: role of private key being appended, must be `owner`, `active`, `posting`, or `memo` only.
-            :wif: a valid private key
+        """Append WIF and the associated role of it for signing transactions.
+
+        If `wif` is empty, role is expected to be a dictionary containing a valid role-wif pairs.
+
+        :param role: role of private key being appended, must be `owner`, `active`, `posting`, or `memo` only.
+        :param wif: a valid private key (Default value = None)
+
         """
         if isinstance(role, dict):
             for r, w in role.items():
@@ -88,21 +101,39 @@ class AppBase:
         if not isinstance(role, str) and not isinstance(wif, str):
             raise NektarException("Role and WIF must be a valid string.")
         if role not in ROLES["all"]:
-            raise NektarException("Role must be `owner`, `active`, `posting`, or `memo` only.")
+            raise NektarException(
+                "Role must be `owner`, `active`, `posting`, or `memo` only."
+            )
         if wif not in list(self.wifs.values()):
             self.wifs[role] = wif
 
     def set_retries(self, retries):
+        """
+
+        :param retries:
+
+        """
         if isinstance(retries, int):
             if 1 <= retries <= 10:
                 self.retries = retries
 
     def set_timeout(self, timeout):
+        """
+
+        :param timeout:
+
+        """
         if isinstance(timeout, int):
             if 5 <= timeout <= 120:
                 self.timeout = timeout
 
+    ## AppBase APIs
     def api(self, name):
+        """
+
+        :param name:
+
+        """
         if name is None:
             self._appbase_api = "condenser_api"
             return self
@@ -115,29 +146,103 @@ class AppBase:
         self._appbase_api = name
         return self
 
+    def condenser(self):
+        """ """
+        self._appbase_api = "condenser_api"
+        return self
+
+    def account_by_key(self):
+        """ """
+        self._appbase_api = "account_by_key_api"
+        return self
+
+    def bridge(self):
+        """ """
+        self._appbase_api = "bridge"
+        return self
+
+    def account_history(self):
+        """ """
+        self._appbase_api = "account_history_api"
+        return self
+
+    def block(self):
+        """ """
+        self._appbase_api = "block_api"
+        return self
+
+    def database(self):
+        """ """
+        self._appbase_api = "database_api"
+        return self
+
+    def debug_node(self):
+        """ """
+        self._appbase_api = "debug_node_api"
+        return self
+
+    def follow(self):
+        """ """
+        self._appbase_api = "follow_api"
+        return self
+
+    def market_history(self):
+        """ """
+        self._appbase_api = "market_history_api"
+        return self
+
+    def network_broadcast(self):
+        """ """
+        self._appbase_api = "network_broadcast_api"
+        return self
+
+    def rc(self):
+        """ """
+        self._appbase_api = "rc_api"
+        return self
+
+    def reputation(self):
+        """ """
+        self._appbase_api = "reputation_api"
+        return self
+
+    ## API methods
     def __getattr__(self, method):
         def callable(*args, **kwargs):
+            """
+
+            :param *args:
+            :param **kwargs:
+
+            """
             return self._dynamic_api_call(method, *args, **kwargs)
+
         return callable
 
     def _dynamic_api_call(self, *args, **kwargs):
+        """
+
+        :param *args:
+        :param **kwargs:
+
+        """
         method = args[0]
         if method not in APPBASE_API[self._appbase_api]:
             raise NektarException(name + " is unsupported.")
         method = self._appbase_api + "." + method
-        
+
         params = []
         if len(args) > 1:
             params = args[1]
         else:
             if self._appbase_api == "condenser_api":
                 params = {}
-        
+
         # raise exception on error or not
         strict = True
         if "strict" in kwargs:
             strict = kwargs["strict"]
-        
+
         ## do not change sorting order !!
         broadcast_methods = [
             "condenser_api.verify_authority",
@@ -147,28 +252,38 @@ class AppBase:
             "database_api.get_required_signatures",
             "database_api.get_transaction_hex",
             "database_api.verify_authority",
-            "network_broadcast_api.broadcast_transaction"
+            "network_broadcast_api.broadcast_transaction",
         ]
 
         if method in broadcast_methods:
             params = [params]
             if method in broadcast_methods[3:]:
-                params = { "trx": params[0] }
+                params = {"trx": params[0]}
 
         if method in broadcast_methods[1:]:
-            return self.broadcast(method, params)
-        return self.request(method, params)
+            return self.broadcast(method, params, strict=strict)
+        return self.request(method, params, strict=strict)
 
-    def request(self, method, params):
-        """
-            Send predefined params as JSON-RPC request.
+    def request(self, method, params, strict=True):
+        """Send predefined params as JSON-RPC request.
+
+        :param method:
+        :param params:
+
         """
         self.rid += 1
         payload = _format_payload(method, params, self.rid)
-        return self._send_request(payload)
-        
+        return self._send_request(payload, strict=strict)
 
     def broadcast(self, method, transaction, strict=True, verify_only=False):
+        """
+
+        :param method:
+        :param transaction:
+        :param strict:  (Default value = True)
+        :param verify_only:  (Default value = False)
+
+        """
         ## check if operations are valid
         operation = ""
         for op in transaction["operations"]:
@@ -179,7 +294,7 @@ class AppBase:
             if operation == "custom_json":
                 if not len(op[1]["required_auths"]):
                     operation = "posting"
-        
+
         signatures = []
         if "signatures" in transaction:
             signatures = transaction["signatures"]
@@ -187,23 +302,23 @@ class AppBase:
 
         ## serialize transaction and sign with private keys
         serialized_transaction = self._serialize(transaction)
-        
+
         ## generate transaction id
         hashed = hashlib.sha256(unhexlify(serialized_transaction)).digest()
         self._transaction_id = hexlify(hashed[:20]).decode("ascii")
-        
+
         ## update transaction signature
         wifs = _get_necessary_wifs(self.wifs, operation)
         signatures.extend(sign_transaction(self.chain_id, serialized_transaction, wifs))
         transaction["signatures"] = list(set(signatures))
         self.signed_transaction = transaction
-        
+
         verified = self.api("condenser").verify_authority(transaction)
         if strict and not verified:
             raise NektarException("Transaction does not contain required signatures.")
         if verify_only:
             return verified
-        
+
         self.rid += 1
         params = [transaction]
         payload = _format_payload(method, params, self.rid)
@@ -214,24 +329,31 @@ class AppBase:
         return result
 
     def _serialize(self, transaction):
-        """
-            Get a hexdump of the serialized binary form of a transaction.
+        """Get a hexdump of the serialized binary form of a transaction.
+
+        :param transaction:
+
         """
         return self.api("condenser").get_transaction_hex([transaction])
 
     def _send_request(self, payload, strict=True):
+        """
+
+        :param payload:
+        :param strict:  (Default value = True)
+
+        """
         response = None
         for node in self.nodes:
             try:
                 url = "https://" + node
-                response = self.session.post(url,
-                                        headers=self.headers,
-                                        json=payload,
-                                        timeout=self.timeout)
+                response = self.session.post(
+                    url, headers=self.headers, json=payload, timeout=self.timeout
+                )
                 response.raise_for_status()
                 break
             except:
-                pass
+                logging.warning(f"Node '{node}' is unavailable, retrying with the next node.")
         if response is None:
             return {}
 
@@ -243,23 +365,41 @@ class AppBase:
                 raise NektarException(response["error"].get("message"))
         return {}
 
+
 #########################
 # utils                 #
 #########################
 
+
 def _get_necessary_wifs(wifs, operation):
+    """
+
+    :param wifs:
+    :param operation:
+
+    """
     for role in ROLES[operation]:
         if role in wifs:
             return [wifs[role]]
     return []
 
+
 def _format_payload(method, params, rid):
-    return {
-        "jsonrpc": "2.0",
-        "method": method,
-        "params": params,
-        "id": rid }
+    """
+
+    :param method:
+    :param params:
+    :param rid:
+
+    """
+    return {"jsonrpc": "2.0", "method": method, "params": params, "id": rid}
+
 
 def _make_expiration(secs=30):
+    """
+
+    :param secs:  (Default value = 30)
+
+    """
     timestamp = time.time() + int(secs)
     return datetime.utcfromtimestamp(timestamp).strftime(BLOCKCHAIN_DT_FORMAT)

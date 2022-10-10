@@ -18,15 +18,20 @@ from binascii import hexlify, unhexlify
 
 from .keys import PrivateKey
 
+
 def sign_transaction(chain_id, serialized_transaction, wifs):
+    """Sign serialized transaction with the private keys.
+
+    :chain_id: dynamically accessed chain id
+    :serialized_transaction: serialized transaction
+    :wifs: list of private keys
+
+    :param chain_id:
+    :param serialized_transaction:
+    :param wifs:
+
     """
-        Sign serialized transaction with the private keys.
-        
-        :chain_id: dynamically accessed chain id
-        :serialized_transaction: serialized transaction
-        :wifs: list of private keys
-    """
-    
+
     message = unhexlify(chain_id + serialized_transaction[:-2])
     digest = hashlib.sha256(message).digest()
 
@@ -40,7 +45,8 @@ def sign_transaction(chain_id, serialized_transaction, wifs):
                 sk.curve.generator.order(),
                 sk.privkey.secret_multiplier,
                 hashlib.sha256,
-                hashlib.sha256(digest + struct.pack("d", time.time())).digest())
+                hashlib.sha256(digest + struct.pack("d", time.time())).digest(),
+            )
 
             sigder = sk.sign_digest(digest, sigencode=ecdsa.util.sigencode_der, k=k)
 
@@ -55,25 +61,41 @@ def sign_transaction(chain_id, serialized_transaction, wifs):
                 i += 31  # compressed 4 + compact 27
                 break
 
-        sigstr = struct.pack('<B', i)
+        sigstr = struct.pack("<B", i)
         sigstr += signature
         signatures.append(hexlify(sigstr).decode("ascii"))
     return signatures
 
+
 def recover_pubkey_parameter(digest, signature, pubkey):
+    """
+
+    :param digest:
+    :param signature:
+    :param pubkey:
+
+    """
     for i in range(0, 4):
         pk = recover_public_key(digest, signature, i)
-        
+
         p = pk.pubkey.point
         order = pk.curve.generator.order()
         x = ecdsa.util.number_to_string(p.x(), order)
         compressed_pk = as_bytes(chr(2 + (p.y() & 1)), "ascii") + x
-        
+
         if pubkey.to_string() in (pk.to_string(), compressed_pk):
             return i
     return None
 
+
 def recover_public_key(digest, signature, i):
+    """
+
+    :param digest:
+    :param signature:
+    :param i:
+
+    """
     curve = ecdsa.SECP256k1.curve
     G = ecdsa.SECP256k1.generator
     order = ecdsa.SECP256k1.order
@@ -86,15 +108,21 @@ def recover_public_key(digest, signature, i):
         y = curve.p() - beta
     e = ecdsa.util.string_to_number(digest)
     R = ecdsa.ellipticcurve.Point(curve, x, y, order)
-    Q = ecdsa.numbertheory.inverse_mod(r, order) * (s * R +
-                                                    (-e % order) * G)
-    if not ecdsa.VerifyingKey.from_public_point(
-            Q, curve=ecdsa.SECP256k1).verify_digest(
-                signature, digest, sigdecode=ecdsa.util.sigdecode_string):
+    Q = ecdsa.numbertheory.inverse_mod(r, order) * (s * R + (-e % order) * G)
+    if not ecdsa.VerifyingKey.from_public_point(Q, curve=ecdsa.SECP256k1).verify_digest(
+        signature, digest, sigdecode=ecdsa.util.sigdecode_string
+    ):
         return None
     return ecdsa.VerifyingKey.from_public_point(Q, curve=ecdsa.SECP256k1)
 
+
 def as_bytes(item, encoding=None):
+    """
+
+    :param item:
+    :param encoding:  (Default value = None)
+
+    """
     if hasattr(item, "__bytes__"):
         return item.__bytes__()
     if encoding:

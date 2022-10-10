@@ -2,6 +2,7 @@ import string
 import hashlib
 from binascii import hexlify, unhexlify
 from .constants import PREFIX
+from .exceptions import NektarException
 
 known_prefixes = [PREFIX]
 
@@ -15,16 +16,11 @@ class Base58(object):
 
     :param data: Data to initialize object, e.g. pubkey data, address data,
     ...
-
     :type data: hex, wif, bip38 encrypted wif, base58 string
-
-    :param str prefix: Prefix to use for Address/PubKey strings (defaults
+    :param str: prefix: Prefix to use for Address/PubKey strings (defaults
     to ``GPH``)
-
-    :return: Base58 object initialized with ``data``
-
+    :returns: Base58 object initialized with ``data``
     :rtype: Base58
-
     :raises ValueError: if data cannot be decoded
 
     * ``bytes(Base58)``: Returns the raw data
@@ -49,17 +45,17 @@ class Base58(object):
             self._hex = base58CheckDecode(data)
         elif data[0] == "K" or data[0] == "L":
             self._hex = base58CheckDecode(data)[:-2]
-        elif data[:len(self._prefix)] == self._prefix:
-            self._hex = gphBase58CheckDecode(data[len(self._prefix):])
+        elif data[: len(self._prefix)] == self._prefix:
+            self._hex = gphBase58CheckDecode(data[len(self._prefix) :])
         else:
             raise ValueError("Error loading Base58 object")
 
     def __format__(self, _format):
-        """ Format output according to argument _format (wif,btc,...)
+        """Format output according to argument _format (wif,btc,...)
 
-            :param str _format: Format to use
-            :return: formatted data according to _format
-            :rtype: str
+        :param str _format: Format to use
+        :return: formatted data according to _format
+        :rtype: str
 
         """
         if _format.upper() == "WIF":
@@ -74,26 +70,26 @@ class Base58(object):
             return _format.upper() + str(self)
 
     def __repr__(self):
-        """ Returns hex value of object
+        """Returns hex value of object
 
-            :return: Hex string of instance"s data
-            :rtype: hex string
+        :return: Hex string of instance"s data
+        :rtype: hex string
         """
         return self._hex
 
     def __str__(self):
-        """ Return graphene-base58CheckEncoded string of data
+        """Return graphene-base58CheckEncoded string of data
 
-            :return: Base58 encoded data
-            :rtype: str
+        :return: Base58 encoded data
+        :rtype: str
         """
         return gphBase58CheckEncode(self._hex)
 
     def __bytes__(self):
-        """ Return raw bytes
+        """Return raw bytes
 
-            :return: Raw bytes of instance
-            :rtype: bytes
+        :return: Raw bytes of instance
+        :rtype: bytes
 
         """
         return unhexlify(self._hex)
@@ -104,6 +100,11 @@ BASE58_ALPHABET = b"123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 
 
 def base58decode(base58_str):
+    """
+
+    :param base58_str:
+
+    """
     base58_text = base58_str.encode("ascii")
     n = 0
     leading_zeroes_count = 0
@@ -122,6 +123,11 @@ def base58decode(base58_str):
 
 
 def base58encode(hexstring):
+    """
+
+    :param hexstring:
+
+    """
     byteseq = compat_bytes(hexstring, "ascii")
     byteseq = unhexlify(byteseq)
     byteseq = compat_bytes(byteseq)
@@ -144,16 +150,32 @@ def base58encode(hexstring):
 
 
 def ripemd160(s):
+    """
+
+    :param s:
+
+    """
     ripemd160 = hashlib.new("ripemd160")
     ripemd160.update(unhexlify(s))
     return ripemd160.digest()
 
 
 def doublesha256(s):
+    """
+
+    :param s:
+
+    """
     return hashlib.sha256(hashlib.sha256(unhexlify(s)).digest()).digest()
 
 
 def base58CheckEncode(version, payload):
+    """
+
+    :param version:
+    :param payload:
+
+    """
     s = ("%.2x" % version) + payload
     checksum = doublesha256(s)[:4]
     result = s + hexlify(checksum).decode("ascii")
@@ -161,22 +183,39 @@ def base58CheckEncode(version, payload):
 
 
 def base58CheckDecode(s):
+    """
+
+    :param s:
+
+    """
     s = unhexlify(base58decode(s))
     dec = hexlify(s[:-4]).decode("ascii")
     checksum = doublesha256(dec)[:4]
-    assert (s[-4:] == checksum)
+    if s[-4:] != checksum:
+        raise NektarException("Invalid WIF detected.")
     return dec[2:]
 
 
 def gphBase58CheckEncode(s):
+    """
+
+    :param s:
+
+    """
     checksum = ripemd160(s)[:4]
     result = s + hexlify(checksum).decode("ascii")
     return base58encode(result)
 
 
 def gphBase58CheckDecode(s):
+    """
+
+    :param s:
+
+    """
     s = unhexlify(base58decode(s))
     dec = hexlify(s[:-4]).decode("ascii")
     checksum = ripemd160(dec)[:4]
-    assert (s[-4:] == checksum)
+    if s[-4:] == checksum:
+        raise NektarException("Invalid WIF detected.")
     return dec
