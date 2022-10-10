@@ -13,7 +13,6 @@ import json
 import logging
 import hashlib
 import requests
-from collections import OrderedDict
 from binascii import hexlify, unhexlify
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
@@ -30,7 +29,15 @@ logging.basicConfig(
 
 
 class AppBase:
-    """ """
+    """Base SDK to communicate with the Hive APIs.
+    ~~~~~~~~~
+
+    :param nodes: a list of valid custom Hive nodes (Default value = None)
+    :param api: a valid AppBase API (Default value = None)
+    :param timeout: the equivalent authority of the WIF (Default value = 10)
+    :param retries: a dictionary of roles and their equivalent WIFs (Default value = 3)
+
+    """
 
     def __init__(self, nodes=None, api=None, timeout=10, retries=3):
 
@@ -69,7 +76,7 @@ class AppBase:
     def custom_nodes(self, nodes):
         """Replace known nodes with custom nodes.
 
-        :param nodes:
+        :param nodes: a list of valid Hive nodes
 
         """
         if nodes is None:
@@ -77,7 +84,7 @@ class AppBase:
         if isinstance(nodes, str):
             nodes = [nodes]
         self.node = []
-        for node in nodes:
+        for node in list(nodes):
             patterns = [r"http[s]{0,1}\:[\/]{2}", r"[\/][\w\W]+"]
             for pattern in patterns:
                 node = re.sub(pattern, "", node)
@@ -110,17 +117,16 @@ class AppBase:
     def set_retries(self, retries):
         """
 
-        :param retries:
+        :param retries: the number of retries when reconnect with the URLs
 
         """
-        if isinstance(retries, int):
-            if 1 <= retries <= 10:
-                self.retries = retries
+        if 1 <= int(retries) <= 10:
+           self.retries = retries
 
     def set_timeout(self, timeout):
         """
 
-        :param timeout:
+        :param timeout: timeout before the request is dropped
 
         """
         if isinstance(timeout, int):
@@ -129,9 +135,9 @@ class AppBase:
 
     ## AppBase APIs
     def api(self, name):
-        """
+        """Set to a valid API.
 
-        :param name:
+        :param name: a valid AppBase API
 
         """
         if name is None:
@@ -147,69 +153,69 @@ class AppBase:
         return self
 
     def condenser(self):
-        """ """
+        """ Set the active API to `condenser_api`. """
         self._appbase_api = "condenser_api"
         return self
 
     def account_by_key(self):
-        """ """
+        """ Set the active API to `account_by_key_api`. """
         self._appbase_api = "account_by_key_api"
         return self
 
     def bridge(self):
-        """ """
+        """ Set the active API to `bridge`. """
         self._appbase_api = "bridge"
         return self
 
     def account_history(self):
-        """ """
+        """ Set the active API to `account_history_api`. """
         self._appbase_api = "account_history_api"
         return self
 
     def block(self):
-        """ """
+        """ Set the active API to `block_api`. """
         self._appbase_api = "block_api"
         return self
 
     def database(self):
-        """ """
+        """ Set the active API to `database_api`. """
         self._appbase_api = "database_api"
         return self
 
     def debug_node(self):
-        """ """
+        """ Set the active API to `debug_node_api`. """
         self._appbase_api = "debug_node_api"
         return self
 
     def follow(self):
-        """ """
+        """ Set the active API to `follow_api`. """
         self._appbase_api = "follow_api"
         return self
 
     def market_history(self):
-        """ """
+        """ Set the active API to `market_history_api`. """
         self._appbase_api = "market_history_api"
         return self
 
     def network_broadcast(self):
-        """ """
+        """ Set the active API to `network_broadcast_api`. """
         self._appbase_api = "network_broadcast_api"
         return self
 
     def rc(self):
-        """ """
+        """ Set the active API to `rc_api`. """
         self._appbase_api = "rc_api"
         return self
 
     def reputation(self):
-        """ """
+        """ Set the active API to `reputation_api`. """
         self._appbase_api = "reputation_api"
         return self
 
     ## API methods
     def __getattr__(self, method):
         def callable(*args, **kwargs):
-            """
+            """Dynamically send an API request using a method call.
 
             :param *args:
             :param **kwargs:
@@ -220,7 +226,7 @@ class AppBase:
         return callable
 
     def _dynamic_api_call(self, *args, **kwargs):
-        """
+        """Dynamically send an API request using a method call.
 
         :param *args:
         :param **kwargs:
@@ -276,7 +282,7 @@ class AppBase:
         return self._send_request(payload, strict=strict)
 
     def broadcast(self, method, transaction, strict=True, verify_only=False):
-        """
+        """Broadcast a transaction to the blockchain.
 
         :param method:
         :param transaction:
@@ -337,10 +343,10 @@ class AppBase:
         return self.api("condenser").get_transaction_hex([transaction])
 
     def _send_request(self, payload, strict=True):
-        """
+        """Send an API request with a valid payload, as defined by the Hive API documentation.
 
-        :param payload:
-        :param strict:  (Default value = True)
+        :param payload: a formatted and valid payload.
+        :param strict: flag to cause exception upon encountering an error (Default value = True)
 
         """
         response = None
@@ -374,8 +380,8 @@ class AppBase:
 def _get_necessary_wifs(wifs, operation):
     """
 
-    :param wifs:
-    :param operation:
+    :param wifs: a list of WIFs
+    :param operation: a valid operation to be performed in the Hive blockchain.
 
     """
     for role in ROLES[operation]:
@@ -385,20 +391,20 @@ def _get_necessary_wifs(wifs, operation):
 
 
 def _format_payload(method, params, rid):
-    """
+    """Format API method parameters to conform to the Hive API documentation.
 
-    :param method:
-    :param params:
-    :param rid:
+    :param method: the API method
+    :param params: the required parameters to successfully perform the operation or request
+    :param rid: the unique RPC id used for debugging purposes
 
     """
     return {"jsonrpc": "2.0", "method": method, "params": params, "id": rid}
 
 
 def _make_expiration(secs=30):
-    """
+    """Create an expiration time based on the current UTC datetime.
 
-    :param secs:  (Default value = 30)
+    :param expire: transaction expiration in seconds (Default value = 30)
 
     """
     timestamp = time.time() + int(secs)

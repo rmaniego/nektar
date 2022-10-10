@@ -3,11 +3,11 @@
 Nektar for Python
 ~~~~~~~~~~~~~~~~
 
-Lightweight and highly customizable communication with the Hive APIs
+Hive API SDK built for Python.
 
 """
 
-__version__ = "0.9.21"
+__version__ = "0.9.22"
 from .nektar import Waggle, Swarm
 from .appbase import AppBase
 

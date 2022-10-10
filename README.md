@@ -35,10 +35,6 @@ import json
 ```python
 from nektar import Waggle
 
-username = "hive-username"
-app = "nectar.app"
-version = "2022.10.05"
-
 hive = Waggle(username)
 ```
 
@@ -67,9 +63,15 @@ hive = Waggle(username, wif=wif, role=role)
 ## option 2
 username = "hive-nektar"
 
-wifs = { "acive": "5*" }
+wifs = { "active": "5*" }
 hive = Waggle(username, wifs=wifs)
 
+```
+
+**Get account details**
+```python
+metadata = json.loads(hive.account["posting_json_metadata"])
+name = metadata["profile"]["name"]
 ```
 
 **Get Blockchain Constants** 

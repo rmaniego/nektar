@@ -28,11 +28,15 @@ from .exceptions import NektarException
 
 
 class Nektar:
-    """Nektar Class
+    """Nektar base class.
     ~~~~~~~~~
 
-    Base Class to access access AppBase/Condenser API methods.
-
+    :param username: a valid Hive account username
+    :param wif: the WIF or private key (Default value = None)
+    :param role: the equivalent authority of the WIF (Default value = None)
+    :param wifs: a dictionary of roles and their equivalent WIFs (Default value = None)
+    :param app: the name of the app built with nektar (Default value = None)
+    :param version: the version `x.y.x` of the app built with nektar (Default value = None)
 
     """
 
@@ -52,10 +56,10 @@ class Nektar:
     def set_username(self, username, wif=None, role=None, wifs=None):
         """Dynamically update the username and WIFs of the instance.
 
-        :param username: valid Hive account username
-        :param wif: the WIF or private key ()
-        :param role: the equivalent authority of the WIF.
-        :param wifs: a dictionary of role and equivalent WIF.
+        :param username: a valid Hive account username
+        :param wif: the WIF or private key (Default value = None)
+        :param role: the equivalent authority of the WIF (Default value = None)
+        :param wifs: a dictionary of roles and their equivalent WIFs (Default value = None)
 
         """
         if not isinstance(username, str):
@@ -228,10 +232,16 @@ class Nektar:
 
 
 class Waggle(Nektar):
-    """Waggle Class
+    """Methods to interact with the Hive Blockchain.
     ~~~~~~~~~
 
-    Methods to interact with the Hive Blockchain.
+    :param username: a valid Hive account username
+    :param wif: the WIF or private key (Default value = None)
+    :param role: the equivalent authority of the WIF (Default value = None)
+    :param wifs: a dictionary of roles and their equivalent WIFs (Default value = None)
+    :param app: the name of the app built with nektar (Default value = None)
+    :param version: the version `x.y.x` of the app built with nektar (Default value = None)
+
     """
 
     def __init__(
@@ -304,7 +314,7 @@ class Waggle(Nektar):
 
         :param community: community name `hive-*`
         :param last: last known subscriber username, paging mechanism (Default value = None)
-        :param limit: maximum limit of subscribers to list. (Default value = 100)
+        :param limit: maximum limit of subscribers to list (Default value = 100)
 
         """
 
@@ -345,7 +355,7 @@ class Waggle(Nektar):
         """Looks up accounts starting with name.
 
         :param start: starting part of username to search (Default value = None)
-        :param limit: maximum limit of accounts to list. (Default value = 100)
+        :param limit: maximum limit of accounts to list (Default value = 100)
 
         """
 
@@ -382,7 +392,7 @@ class Waggle(Nektar):
     def followers(self, account=None, start=None, ignore=False, limit=1000):
         """Looks up accounts starting with name.
 
-        :param account: valid Hive account username, default = username (Default value = None)
+        :param account: a valid Hive account username, default = username (Default value = None)
         :param start: account to start from, paging mechanism (Default value = None)
         :param ignore: show all muted accounts if True (Default value = False)
         :param limit: maximum limit of accounts to list (Default value = 1000)
@@ -424,7 +434,7 @@ class Waggle(Nektar):
         return results[:custom_limit]
 
     def history(self, account=None, start=-1, limit=1000, low=None, high=None):
-        """Get all account delegators and other related information.
+        """Get a list of account history.
 
         :param account: any valid Hive account username, default = initialized username (Default value = None)
         :param start: upperbound range, or -1 for reverse history (Default value = -1)
@@ -891,6 +901,10 @@ class Waggle(Nektar):
         match = re.findall(pattern, permlink)
         if not len(match):
             raise NektarException("permlink must be a valid url-escaped string.")
+        
+        if isinstance(percent, (int, float)):
+            percent = _within_range(percent, -100, 100)
+            weight = 10000 * (percent/100)
 
         ref_block_num, ref_block_prefix = self.get_reference_block_data()
         weight = _within_range(weight, -10000, 10000, 10000)
@@ -962,6 +976,7 @@ class Waggle(Nektar):
             raise NektarException("Amount must be a positive numeric value.")
         if amount <= 0:
             raise NektarException("Amount must be a positive numeric value.")
+        asset = asset.upper()
         if asset not in ("HBD", "HIVE"):
             raise NektarException("Memo only accepts transfer of HBD and HIVE assets.")
 
@@ -1023,11 +1038,16 @@ class Waggle(Nektar):
 
 
 class Swarm(Nektar):
-    """Swarm Class
+    """Methods for admins and moderators to manage communities.
     ~~~~~~~~~
 
-    Wrapped methods for admins and moderators to manage communities.
-
+    :param community: a valid Hive community name `hive-*`
+    :param username: a valid Hive account username
+    :param wif: the WIF or private key (Default value = None)
+    :param role: the equivalent authority of the WIF (Default value = None)
+    :param wifs: a dictionary of roles and their equivalent WIFs (Default value = None)
+    :param app: the name of the app built with nektar (Default value = None)
+    :param version: the version `x.y.x` of the app built with nektar (Default value = None)
 
     """
 
