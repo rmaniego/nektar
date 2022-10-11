@@ -9,10 +9,11 @@
     :license: MIT License
 """
 
+import re
 import json
-import logging
 import hashlib
 import requests
+import warnings
 from binascii import hexlify, unhexlify
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
@@ -21,12 +22,6 @@ from .transactions import sign_transaction, as_bytes
 from .constants import NEKTAR_VERSION, NODES, APPBASE_API, BLOCKCHAIN_OPERATIONS, ROLES
 from .exceptions import NektarException
 
-logging.basicConfig(
-    filename="nektar.log",
-    filemode="a+",
-    format="%(name)s - %(levelname)s - %(message)s",
-)
-
 
 class AppBase:
     """Base SDK to communicate with the Hive APIs.
@@ -34,17 +29,26 @@ class AppBase:
 
     :param nodes: a list of valid custom Hive nodes (Default value = None)
     :param api: a valid AppBase API (Default value = None)
-    :param timeout: the equivalent authority of the WIF (Default value = 10)
+    :param timeout: seconds before the request is dropped (Default value = 10)
     :param retries: a dictionary of roles and their equivalent WIFs (Default value = 3)
+    :param warning: display warning messages (Default value = False)
 
     """
 
-    def __init__(self, nodes=None, api=None, timeout=10, retries=3):
+    def __init__(self, nodes=None, api=None, timeout=10, retries=3, warning=False):
 
         # set default to condenser api
         self._appbase_api = self.api(api)
         self.method = None
         self.rid = 0
+
+        if not isinstance(warning, bool):
+            raise NektarException("Warning must be `True` or `False` only.")
+        if not warning:
+            warnings.filterwarnings(
+                "ignore",
+                ".*unavailable.*",
+            )
 
         # set session retries
         self.retries = 3
@@ -92,20 +96,20 @@ class AppBase:
                 raise NektarException("Invalid node format.")
             self.nodes.append(node)
 
-    def append_wif(self, role, wif=None):
+    def append_wif(self, wif, role=None):
         """Append WIF and the associated role of it for signing transactions.
 
         If `wif` is empty, role is expected to be a dictionary containing a valid role-wif pairs.
 
-        :param role: role of private key being appended, must be `owner`, `active`, `posting`, or `memo` only.
         :param wif: a valid private key (Default value = None)
+        :param role: role of private key being appended, must be `owner`, `active`, `posting`, or `memo` only.
 
         """
-        if isinstance(role, dict):
-            for r, w in role.items():
-                self.append_wif(r, w)
+        if isinstance(wif, dict):
+            for r, w in wif.items():
+                self.append_wif(w, r)
             return
-        if not isinstance(role, str) and not isinstance(wif, str):
+        if not isinstance(wif, str) and not isinstance(role, str):
             raise NektarException("Role and WIF must be a valid string.")
         if role not in ROLES["all"]:
             raise NektarException(
@@ -121,17 +125,16 @@ class AppBase:
 
         """
         if 1 <= int(retries) <= 10:
-           self.retries = retries
+            self.retries = retries
 
     def set_timeout(self, timeout):
         """
 
-        :param timeout: timeout before the request is dropped
+        :param timeout: seconds before the request is dropped
 
         """
-        if isinstance(timeout, int):
-            if 5 <= timeout <= 120:
-                self.timeout = timeout
+        if 5 <= int(timeout) <= 120:
+            self.timeout = timeout
 
     ## AppBase APIs
     def api(self, name):
@@ -153,62 +156,62 @@ class AppBase:
         return self
 
     def condenser(self):
-        """ Set the active API to `condenser_api`. """
+        """Set the active API to `condenser_api`."""
         self._appbase_api = "condenser_api"
         return self
 
     def account_by_key(self):
-        """ Set the active API to `account_by_key_api`. """
+        """Set the active API to `account_by_key_api`."""
         self._appbase_api = "account_by_key_api"
         return self
 
     def bridge(self):
-        """ Set the active API to `bridge`. """
+        """Set the active API to `bridge`."""
         self._appbase_api = "bridge"
         return self
 
     def account_history(self):
-        """ Set the active API to `account_history_api`. """
+        """Set the active API to `account_history_api`."""
         self._appbase_api = "account_history_api"
         return self
 
     def block(self):
-        """ Set the active API to `block_api`. """
+        """Set the active API to `block_api`."""
         self._appbase_api = "block_api"
         return self
 
     def database(self):
-        """ Set the active API to `database_api`. """
+        """Set the active API to `database_api`."""
         self._appbase_api = "database_api"
         return self
 
     def debug_node(self):
-        """ Set the active API to `debug_node_api`. """
+        """Set the active API to `debug_node_api`."""
         self._appbase_api = "debug_node_api"
         return self
 
     def follow(self):
-        """ Set the active API to `follow_api`. """
+        """Set the active API to `follow_api`."""
         self._appbase_api = "follow_api"
         return self
 
     def market_history(self):
-        """ Set the active API to `market_history_api`. """
+        """Set the active API to `market_history_api`."""
         self._appbase_api = "market_history_api"
         return self
 
     def network_broadcast(self):
-        """ Set the active API to `network_broadcast_api`. """
+        """Set the active API to `network_broadcast_api`."""
         self._appbase_api = "network_broadcast_api"
         return self
 
     def rc(self):
-        """ Set the active API to `rc_api`. """
+        """Set the active API to `rc_api`."""
         self._appbase_api = "rc_api"
         return self
 
     def reputation(self):
-        """ Set the active API to `reputation_api`. """
+        """Set the active API to `reputation_api`."""
         self._appbase_api = "reputation_api"
         return self
 
@@ -290,6 +293,7 @@ class AppBase:
         :param verify_only:  (Default value = False)
 
         """
+
         ## check if operations are valid
         operation = ""
         for op in transaction["operations"]:
@@ -360,7 +364,9 @@ class AppBase:
                 response = json.loads(response.content.decode("utf-8"))
                 break
             except:
-                logging.warning(f"Node '{node}' is unavailable, retrying with the next node.")
+                warnings.warn(
+                    f"Node '{node}' is unavailable, retrying with the next node."
+                )
         if response is None:
             return {}
         if "result" in response:

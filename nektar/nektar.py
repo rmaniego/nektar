@@ -37,15 +37,26 @@ class Nektar:
     :param wifs: a dictionary of roles and their equivalent WIFs (Default value = None)
     :param app: the name of the app built with nektar (Default value = None)
     :param version: the version `x.y.x` of the app built with nektar (Default value = None)
+    :param timeout: seconds before the request is dropped (Default value = 10)
+    :param retries: a dictionary of roles and their equivalent WIFs (Default value = 3)
+    :param warning: display warning messages (Default value = False)
 
     """
 
     def __init__(
-        self, username, wif=None, role=None, wifs=None, app=None, version=None
+        self,
+        username,
+        wif=None,
+        role=None,
+        wifs=None,
+        app=None,
+        version=None,
+        timeout=10,
+        retries=3,
+        warning=False,
     ):
-        self.appbase = AppBase()
-        self.set_username(username)
-
+        self.appbase = AppBase(timeout=timeout, retries=retries, warning=warning)
+        self.set_username(username, wif, role, wifs)
 
         self.account = None
         self.refresh()
@@ -67,15 +78,15 @@ class Nektar:
         self.username = username
 
         if isinstance(role, str) and isinstance(wif, str):
-            self.appbase.append_wif(role, wif)
+            self.appbase.append_wif(wif, role)
         elif isinstance(wifs, dict):
             self.appbase.append_wif(wifs)
-            
+
         self.roles = list(self.appbase.wifs.keys())
 
     def refresh(self):
         """Get a more recent version of the account data."""
-        self.account = self.appbase.api("condenser").get_accounts([[self.username]])[0]
+        self.account = self.appbase.condenser().get_accounts([[self.username]])[0]
 
     def resource_credits(self, account=None):
         """Get the current resource credits of an account.
@@ -94,7 +105,7 @@ class Nektar:
             raise NektarException("Account must be a string of length 3 - 16.")
         params["accounts"] = [account]
 
-        data = self.appbase.api("rc").find_rc_accounts(params)["rc_accounts"]
+        data = self.appbase.rc().find_rc_accounts(params)["rc_accounts"]
         if not data:
             return {}
         return data[0]
@@ -119,7 +130,7 @@ class Nektar:
         # Hive Developer Portal > Understanding Configuration Values
         # https://developers.hive.io/tutorials-recipes/understanding-configuration-values.html
         if self.config is None:
-            self.config = self.appbase.api("database").get_config({})
+            self.config = self.appbase.database().get_config({})
         if isinstance(field, str):
             return self.config.get(field, fallback)
         return self.config
@@ -140,7 +151,7 @@ class Nektar:
 
         """
         block_number = head_block_number - 2
-        blocks = self.appbase.api("block").get_block({"block_num": block_number})
+        blocks = self.appbase.block().get_block({"block_num": block_number})
         return blocks["block"]["previous"]
 
     def get_reference_block_data(self):
@@ -164,12 +175,7 @@ class Nektar:
     ):
         """Provides a generic way to add higher level protocols.
 
-        :json_id:
-        :json_data:
-        :required_auths:
-        :required_posting_auths:
-
-        :param json_id: a valid string in a lowercase snake case form
+        :param json_id: a valid string in a lowercase and (snake_case or kebab-case) format
         :param json_data: any valid JSON data
         :param required_auths: list of usernames required to sign with private keys
         :param required_posting_auths: list of usernames required to sign with a `posting` private key
@@ -205,9 +211,9 @@ class Nektar:
             )
         data["required_posting_auths"] = required_posting_auths
 
-        if len(re.findall(r"[^\w]+", json_id)):
+        if len(re.findall(r"[^\w\-]+", json_id)):
             raise NektarException(
-                "Custom JSON id must be a valid string preferrably in lowercase and snake case format."
+                "Custom JSON id must be a valid string preferrably in lowercase and (snake_case or kebab-case) format."
             )
         data["id"] = json_id
 
@@ -245,10 +251,18 @@ class Waggle(Nektar):
     """
 
     def __init__(
-        self, username, wif=None, role=None, wifs=None, app=None, version=None
+        self,
+        username,
+        wif=None,
+        role=None,
+        wifs=None,
+        app=None,
+        version=None,
+        timeout=10,
+        retries=3,
+        warning=False,
     ):
-
-        self.appbase = AppBase()
+        self.appbase = AppBase(timeout=timeout, retries=retries, warning=warning)
         self.set_username(username, wif, role, wifs)
 
         self.account = None
@@ -300,7 +314,7 @@ class Waggle(Nektar):
 
         results = []
         for _ in range(crawls):
-            result = self.appbase.api("bridge").list_communities(params)
+            result = self.appbase.bridge().list_communities(params)
             results.extend(result)
             if len(result) < 100:
                 break
@@ -342,7 +356,7 @@ class Waggle(Nektar):
 
         results = []
         for _ in range(crawls):
-            result = self.appbase.api("bridge").list_subscribers(params)
+            result = self.appbase.bridge().list_subscribers(params)
             results.extend(result)
             if len(result) < 100:
                 break
@@ -379,7 +393,7 @@ class Waggle(Nektar):
             if not len(start):
                 params[0] = letter
             for _ in range(crawls):
-                result = self.appbase.api("condenser").lookup_accounts(params)
+                result = self.appbase.condenser().lookup_accounts(params)
                 results.extend(result)
                 if len(result) < 1000:
                     break
@@ -423,7 +437,7 @@ class Waggle(Nektar):
 
         results = []
         for _ in range(crawls):
-            result = self.appbase.api("condenser").get_followers(params)
+            result = self.appbase.condenser().get_followers(params)
             for item in result:
                 results.append(item["follower"])
             if len(result) < 1000:
@@ -477,7 +491,7 @@ class Waggle(Nektar):
             params.append(0)  # set to `operation_filter_low` zero
             params.append(int("1".ljust(high + 1, "0"), 2))
 
-        return self.appbase.api("condenser").get_account_history(params)
+        return self.appbase.condenser().get_account_history(params)
 
     def delegators(self, account=None, active=False):
         """Get all account delegators and other related information.
@@ -499,7 +513,7 @@ class Waggle(Nektar):
         results = {}
         while True:
             try:
-                result = self.appbase.api("condenser").get_account_history(params)
+                result = self.appbase.condenser().get_account_history(params)
             except:
                 if params[1] == -1:
                     break
@@ -550,7 +564,7 @@ class Waggle(Nektar):
         results = {}
         while True:
             try:
-                result = self.appbase.api("condenser").get_account_history(params)
+                result = self.appbase.condenser().get_account_history(params)
             except:
                 if params[1] == -1:
                     break
@@ -617,7 +631,7 @@ class Waggle(Nektar):
         filter = [True, False]
         if isinstance(paidout, bool):
             filter = [paidout]
-        result = self.appbase.api("bridge").get_ranked_posts(params)
+        result = self.appbase.bridge().get_ranked_posts(params)
         for post in result:
             if not post["depth"] and post["is_paidout"] in filter:
                 results.append(post)
@@ -650,7 +664,7 @@ class Waggle(Nektar):
         filter = [True, False]
         if isinstance(paidout, bool):
             filter = [paidout]
-        result = self.appbase.api("bridge").get_account_posts(params)
+        result = self.appbase.bridge().get_account_posts(params)
         for post in result:
             if not post["depth"] and post["is_paidout"] in filter:
                 results.append(post)
@@ -685,7 +699,7 @@ class Waggle(Nektar):
         strict = retries == 1
 
         for _ in range(retries):
-            data = self.appbase.api("bridge").get_post(params, strict=strict)
+            data = self.appbase.bridge().get_post(params, strict=strict)
             if len(data):
                 return data
         return {}
@@ -901,10 +915,10 @@ class Waggle(Nektar):
         match = re.findall(pattern, permlink)
         if not len(match):
             raise NektarException("permlink must be a valid url-escaped string.")
-        
+
         if isinstance(percent, (int, float)):
             percent = _within_range(percent, -100, 100)
-            weight = 10000 * (percent/100)
+            weight = 10000 * (percent / 100)
 
         ref_block_num, ref_block_prefix = self.get_reference_block_data()
         weight = _within_range(weight, -10000, 10000, 10000)
@@ -1015,7 +1029,7 @@ class Waggle(Nektar):
         :param transaction: a valid transaction data
 
         """
-        return self.appbase.api("condenser").verify_authority(transaction, strict=False)
+        return self.appbase.condenser().verify_authority(transaction, strict=False)
 
     def _broadcast(
         self, transaction, synchronous=False, strict=True, verify_only=False
@@ -1060,11 +1074,12 @@ class Swarm(Nektar):
         wifs=None,
         app=None,
         version=None,
+        timeout=10,
+        retries=3,
+        warning=False,
     ):
-
-        self.appbase = AppBase()
+        self.appbase = AppBase(timeout=timeout, retries=retries, warning=warning)
         self.set_username(username, wif, role, wifs)
-
 
         self.account = None
         self.refresh()
