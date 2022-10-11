@@ -357,13 +357,12 @@ class AppBase:
                     url, headers=self.headers, json=payload, timeout=self.timeout
                 )
                 response.raise_for_status()
+                response = json.loads(response.content.decode("utf-8"))
                 break
             except:
                 logging.warning(f"Node '{node}' is unavailable, retrying with the next node.")
         if response is None:
             return {}
-
-        response = json.loads(response.content.decode("utf-8"))
         if "result" in response:
             return response["result"]
         if "error" in response:
