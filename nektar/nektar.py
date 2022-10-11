@@ -38,7 +38,7 @@ class Nektar:
     :param app: the name of the app built with nektar (Default value = None)
     :param version: the version `x.y.x` of the app built with nektar (Default value = None)
     :param timeout: seconds before the request is dropped (Default value = 10)
-    :param retries: a dictionary of roles and their equivalent WIFs (Default value = 3)
+    :param retries: times the request retries if errors are encountered (Default value = 3)
     :param warning: display warning messages (Default value = False)
 
     """
@@ -236,6 +236,33 @@ class Nektar:
         }
         return self._broadcast(transaction, synchronous)
 
+    def verify_authority(self, transaction):
+        """Returns true if the transaction has all of the required signatures.
+
+        :param transaction: a valid transaction data
+
+        """
+        return self.appbase.condenser().verify_authority(transaction, strict=False)
+
+    def _broadcast(
+        self, transaction, synchronous=False, strict=True, verify_only=False
+    ):
+        """Processes the transaction for broadcasting into the blockchain.
+
+        :param transaction: the formatted transaction based on the API method
+        :param synchronous: broadcasting     method (Default value = False)
+        :param strict: flag to cause exception upon encountering an error (Default value = True)
+        :param verify_only: flag to verify required authority or to fully complete the broadcast operation (Default value = False)
+
+        """
+        method = "condenser_api.broadcast_transaction"
+        if synchronous:
+            method = "condenser_api.broadcast_transaction_synchronous"
+            result = self.appbase.broadcast(method, transaction, strict, verify_only)
+            if result:
+                return result
+        return self.appbase.broadcast(method, transaction, strict, verify_only)
+
 
 class Waggle(Nektar):
     """Methods to interact with the Hive Blockchain.
@@ -247,6 +274,9 @@ class Waggle(Nektar):
     :param wifs: a dictionary of roles and their equivalent WIFs (Default value = None)
     :param app: the name of the app built with nektar (Default value = None)
     :param version: the version `x.y.x` of the app built with nektar (Default value = None)
+    :param timeout: seconds before the request is dropped (Default value = 10)
+    :param retries: times the request retries if errors are encountered (Default value = 3)
+    :param warning: display warning messages (Default value = False)
 
     """
 
@@ -462,9 +492,7 @@ class Waggle(Nektar):
         if isinstance(account, str):
             params[0] = account
 
-        if not isinstance(start, int):
-            raise NektarException("Start must be an integer.")
-        if not (start == -1 or start > 999):
+        if not (int(start) == -1 or int(start) > 999):
             raise NektarException(
                 "Start be `-1` or an upperbound of value 1000 or higher."
             )
@@ -476,7 +504,7 @@ class Waggle(Nektar):
         operations = list(range(len(BLOCKCHAIN_OPERATIONS)))
         if isinstance(low, int):
             ## for the first 64 blockchain operation
-            if low not in operations:
+            if int(low) not in operations:
                 raise NektarException(
                     "Operation Filter `low` is not a valid blockchain operation ID."
                 )
@@ -692,9 +720,7 @@ class Waggle(Nektar):
         params["permlink"] = permlink
         params["observer"] = self.username
 
-        if not isinstance(retries, int):
-            raise NektarException("Retries must be an integer.")
-        if not (1 <= retries <= 5):
+        if not (1 <= int(retries) <= 5):
             raise NektarException("Retries must be between 1 to 5 times.")
         strict = retries == 1
 
@@ -739,8 +765,6 @@ class Waggle(Nektar):
         data = {}
         data["author"] = self.username
 
-        if not isinstance(title, str):
-            raise NektarException("Title must be a UTF-8 string.")
         title = re.sub(r"[\r\n]", "", title)
         if not (1 <= len(title.encode("utf-8")) <= 256):
             raise NektarException("Title must be within 1 to 256 bytes.")
@@ -1023,33 +1047,6 @@ class Waggle(Nektar):
 
         return self._broadcast(transaction, synchronous, strict, verify_only)
 
-    def verify_authority(self, transaction):
-        """Returns true if the transaction has all of the required signatures.
-
-        :param transaction: a valid transaction data
-
-        """
-        return self.appbase.condenser().verify_authority(transaction, strict=False)
-
-    def _broadcast(
-        self, transaction, synchronous=False, strict=True, verify_only=False
-    ):
-        """Processes the transaction for broadcasting into the blockchain.
-
-        :param transaction: the formatted transaction based on the API method
-        :param synchronous: broadcasting     method (Default value = False)
-        :param strict: flag to cause exception upon encountering an error (Default value = True)
-        :param verify_only: flag to verify required authority or to fully complete the broadcast operation (Default value = False)
-
-        """
-        method = "condenser_api.broadcast_transaction"
-        if synchronous:
-            method = "condenser_api.broadcast_transaction_synchronous"
-            result = self.appbase.broadcast(method, transaction, strict, verify_only)
-            if result:
-                return result
-        return self.appbase.broadcast(method, transaction, strict, verify_only)
-
 
 class Swarm(Nektar):
     """Methods for admins and moderators to manage communities.
@@ -1062,6 +1059,9 @@ class Swarm(Nektar):
     :param wifs: a dictionary of roles and their equivalent WIFs (Default value = None)
     :param app: the name of the app built with nektar (Default value = None)
     :param version: the version `x.y.x` of the app built with nektar (Default value = None)
+    :param timeout: seconds before the request is dropped (Default value = 10)
+    :param retries: times the request retries if errors are encountered (Default value = 3)
+    :param warning: display warning messages (Default value = False)
 
     """
 
@@ -1100,12 +1100,363 @@ class Swarm(Nektar):
 
         self._required_posting_auths = [self.username]
 
-    def mute(self, author, permlink, notes):
+    def mute(
+        self,
+        author,
+        permlink,
+        notes,
+        mute=True,
+        expire=30,
+        synchronous=False,
+        strict=True,
+        verify_only=False,
+    ):
         """Mute posts or comments with a designated note.
 
-        :param author: username of author of the blog post being replied to
-        :param permlink: permlink to the blog post being muted
+        :param author: username of author of the blog post
+        :param permlink: permlink to the blog post
         :param notes: reason for muting
+        :param mute: mute author (Default value = True)
+        :param expire: transaction expiration in seconds (Default value = 30)
+        :param synchronous: broadcasting method (Default value = False)
+        :param strict: flag to cause exception upon encountering an error (Default value = True)
+        :param verify_only: flag to verify required authority or to fully complete the broadcast operation (Default value = False)
+
+        """
+
+        if not isinstance(author, str):
+            raise NektarException("Username must be a valid Hive account username.")
+
+        pattern = r"[\w][\w\d\-\%]{0,255}"
+        if not len(re.findall(pattern, permlink)):
+            raise NektarException("The permlink must be a valid url-escaped string.")
+
+        if not isinstance(notes, str):
+            raise NektarException("Notes must be in string format.")
+
+        action = "mutePost"
+        if not isinstance(mute, bool):
+            raise NektarException("`mute` must be either `True` or `False` only.")
+        if not mute:
+            action = "unmutePost"
+
+        data = {}
+        data["required_auths"] = []
+        data["required_posting_auths"] = [self.username]
+        data["id"] = "community"
+
+        json_data = {}
+        json_data["community"] = self._community
+        json_data["account"] = author
+        json_data["permlink"] = permlink
+        json_data["notes"] = notes
+        operation = [action, json_data]
+        data["json"] = json.dumps(operation).replace("'", '\\"')
+
+        ref_block_num, ref_block_prefix = self.get_reference_block_data()
+        expire = _within_range(expire, 5, 120, 30)
+        expiration = _make_expiration(expire)
+        synchronous = _true_or_false(synchronous, False)
+        strict = _true_or_false(strict, True)
+        verify_only = _true_or_false(verify_only, False)
+
+        operations = [["custom_json", data]]
+        transaction = {
+            "ref_block_num": ref_block_num,
+            "ref_block_prefix": ref_block_prefix,
+            "expiration": expiration,
+            "operations": operations,
+            "extensions": [],
+        }
+        return self._broadcast(transaction, synchronous, strict, verify_only)
+
+    def unmute(
+        self,
+        author,
+        permlink,
+        notes,
+        expire=30,
+        synchronous=False,
+        strict=True,
+        verify_only=False,
+    ):
+        """Unmute posts or comments with a designated note.
+
+        :param author: username of author of the blog post
+        :param permlink: permlink to the blog post
+        :param notes: reason for unmuting
+        :param expire: transaction expiration in seconds (Default value = 30)
+        :param synchronous: broadcasting method (Default value = False)
+        :param strict: flag to cause exception upon encountering an error (Default value = True)
+        :param verify_only: flag to verify required authority or to fully complete the broadcast operation (Default value = False)
+
+        """
+        return self.mute(author, permlink, notes, False, expire, strict, verify_only)
+
+    def mark_spam(
+        self,
+        author,
+        permlink,
+        expire=30,
+        synchronous=False,
+        strict=True,
+        verify_only=False,
+    ):
+        """Muting post but noted as `spam` as standardized label for spams.
+
+        :param author: a valid blockchain account username
+        :param permlink: actual permlink to the specified author
+        :param expire: transaction expiration in seconds (Default value = 30)
+        :param synchronous: broadcasting method (Default value = False)
+        :param strict: flag to cause exception upon encountering an error (Default value = True)
+        :param verify_only: flag to verify required authority or to fully complete the broadcast operation (Default value = False)
+
+        """
+        self.mute(author, permlink, "spam", True, expire, strict, verify_only)
+
+    def update(
+        self,
+        title,
+        about,
+        is_nsfw,
+        description,
+        flag_text,
+        expire=30,
+        synchronous=False,
+        strict=True,
+        verify_only=False,
+    ):
+        """Update community properties.
+
+        :param title: username of author of the blog post
+        :param about: permlink to the blog post
+        :param is_nsfw: (not suitable or safe for work
+        :param description: mute author (Default value = True)
+        :param flag_text: mute author (Default value = True)
+        :param expire: transaction expiration in seconds (Default value = 30)
+        :param synchronous: broadcasting method (Default value = False)
+        :param strict: flag to cause exception upon encountering an error (Default value = True)
+        :param verify_only: flag to verify required authority or to fully complete the broadcast operation (Default value = False)
+
+        """
+
+        title = re.sub(r"[\r\n]", "", title)
+        if not (1 <= len(title.encode("utf-8")) <= 20):
+            raise NektarException("`title` parameter must be a string.")
+
+        about = re.sub(r"[\r\n]", "", about)
+        if not (0 <= len(about.encode("utf-8")) <= 120):
+            raise NektarException("`about` parameter must be a string.")
+
+        if not isinstance(is_nsfw, bool):
+            raise NektarException("`is_nsfw` must be either `True` or `False` only.")
+
+        if not (0 <= len(description.encode("utf-8")) <= 1000):
+            raise NektarException("`description` parameter must be a string.")
+
+        if not (0 <= len(flag_text.encode("utf-8")) <= 1000):
+            raise NektarException("`flag_text` parameter must be a string.")
+
+        data = {}
+        data["required_auths"] = []
+        data["required_posting_auths"] = [self.username]
+        data["id"] = "community"
+
+        props = {}
+        props["title"] = title
+        props["about"] = about
+        props["is_nsfw"] = is_nsfw
+        props["description"] = description
+        props["flag_text"] = flag_text
+
+        json_data = {}
+        json_data["community"] = self._community
+        json_data["props"] = props
+        operation = ["updateProps", json_data]
+        data["json"] = json.dumps(operation).replace("'", '\\"')
+
+        ref_block_num, ref_block_prefix = self.get_reference_block_data()
+        expire = _within_range(expire, 5, 120, 30)
+        expiration = _make_expiration(expire)
+        synchronous = _true_or_false(synchronous, False)
+        strict = _true_or_false(strict, True)
+        verify_only = _true_or_false(verify_only, False)
+
+        operations = [["custom_json", data]]
+        transaction = {
+            "ref_block_num": ref_block_num,
+            "ref_block_prefix": ref_block_prefix,
+            "expiration": expiration,
+            "operations": operations,
+            "extensions": [],
+        }
+        return self._broadcast(transaction, synchronous, strict, verify_only)
+
+    def subscribe(
+        self,
+        subscribe=True,
+        expire=30,
+        synchronous=False,
+        strict=True,
+        verify_only=False,
+    ):
+        """Subscribe to the community.
+
+        :param mute: subscribe to the community (Default value = True)
+        :param expire: transaction expiration in seconds (Default value = 30)
+        :param synchronous: broadcasting method (Default value = False)
+        :param strict: flag to cause exception upon encountering an error (Default value = True)
+        :param verify_only: flag to verify required authority or to fully complete the broadcast operation (Default value = False)
+
+        """
+
+        action = "subscribe"
+        if not isinstance(subscribe, bool):
+            raise NektarException("`subscribe` must be either `True` or `False` only.")
+        if not subscribe:
+            action = "unsubscribe"
+
+        data = {}
+        data["required_auths"] = []
+        data["required_posting_auths"] = [self.username]
+        data["id"] = "community"
+
+        operation = [action, {"community": self._community}]
+        data["json"] = json.dumps(operation).replace("'", '\\"')
+
+        ref_block_num, ref_block_prefix = self.get_reference_block_data()
+        expire = _within_range(expire, 5, 120, 30)
+        expiration = _make_expiration(expire)
+        synchronous = _true_or_false(synchronous, False)
+        strict = _true_or_false(strict, True)
+        verify_only = _true_or_false(verify_only, False)
+
+        operations = [["custom_json", data]]
+        transaction = {
+            "ref_block_num": ref_block_num,
+            "ref_block_prefix": ref_block_prefix,
+            "expiration": expiration,
+            "operations": operations,
+            "extensions": [],
+        }
+        return self._broadcast(transaction, synchronous, strict, verify_only)
+
+    def unsubscribe(self, expire=30, synchronous=False, strict=True, verify_only=False):
+        """Unsubscribe to the community.
+
+        :param expire: transaction expiration in seconds (Default value = 30)
+        :param synchronous: broadcasting method (Default value = False)
+        :param strict: flag to cause exception upon encountering an error (Default value = True)
+        :param verify_only: flag to verify required authority or to fully complete the broadcast operation (Default value = False)
+
+        """
+
+        return self.subscribe(False, expire, synchronous, strict, verify_only)
+
+    def pin(
+        self,
+        author,
+        permlink,
+        pin=True,
+        expire=30,
+        synchronous=False,
+        strict=True,
+        verify_only=False,
+    ):
+        """Pin post to the top of the community homepage.
+
+        :param author: username of author of the blog post
+        :param permlink: permlink to the blog post
+        :param expire: transaction expiration in seconds (Default value = 30)
+        :param synchronous: broadcasting method (Default value = False)
+        :param strict: flag to cause exception upon encountering an error (Default value = True)
+        :param verify_only: flag to verify required authority or to fully complete the broadcast operation (Default value = False)
+
+        """
+
+        if not isinstance(author, str):
+            raise NektarException("Username must be a valid Hive account username.")
+
+        pattern = r"[\w][\w\d\-\%]{0,255}"
+        if not len(re.findall(pattern, permlink)):
+            raise NektarException("The permlink must be a valid url-escaped string.")
+
+        action = "pinPost"
+        if not isinstance(pin, bool):
+            raise NektarException("`pin` must be either `True` or `False` only.")
+        if not pin:
+            action = "unpinPost"
+
+        data = {}
+        data["required_auths"] = []
+        data["required_posting_auths"] = [self.username]
+        data["id"] = "community"
+
+        json_data = {}
+        json_data["community"] = self._community
+        json_data["account"] = author
+        json_data["permlink"] = permlink
+        operation = [action, json_data]
+        data["json"] = json.dumps(operation).replace("'", '\\"')
+
+        ref_block_num, ref_block_prefix = self.get_reference_block_data()
+        expire = _within_range(expire, 5, 120, 30)
+        expiration = _make_expiration(expire)
+        synchronous = _true_or_false(synchronous, False)
+        strict = _true_or_false(strict, True)
+        verify_only = _true_or_false(verify_only, False)
+
+        operations = [["custom_json", data]]
+        transaction = {
+            "ref_block_num": ref_block_num,
+            "ref_block_prefix": ref_block_prefix,
+            "expiration": expiration,
+            "operations": operations,
+            "extensions": [],
+        }
+        return self._broadcast(transaction, synchronous, strict, verify_only)
+
+    def unpin(
+        self,
+        author,
+        permlink,
+        expire=30,
+        synchronous=False,
+        strict=True,
+        verify_only=False,
+    ):
+        """Unpin post from the top of the community homepage.
+
+        :param author: username of author of the blog post
+        :param permlink: permlink to the blog post
+        :param expire: transaction expiration in seconds (Default value = 30)
+        :param synchronous: broadcasting method (Default value = False)
+        :param strict: flag to cause exception upon encountering an error (Default value = True)
+        :param verify_only: flag to verify required authority or to fully complete the broadcast operation (Default value = False)
+
+        """
+
+        self.pin(author, permlink, False, expire, synchronous, strict, verify_only)
+
+    def flag(
+        self,
+        author,
+        permlink,
+        notes,
+        expire=30,
+        synchronous=False,
+        strict=True,
+        verify_only=False,
+    ):
+        """It’s up to the community to define what constitutes flagging.
+
+        :param author: username of author of the blog post
+        :param permlink: permlink to the blog post
+        :param notes: reason for muting
+        :param expire: transaction expiration in seconds (Default value = 30)
+        :param synchronous: broadcasting method (Default value = False)
+        :param strict: flag to cause exception upon encountering an error (Default value = True)
+        :param verify_only: flag to verify required authority or to fully complete the broadcast operation (Default value = False)
 
         """
 
@@ -1129,7 +1480,7 @@ class Swarm(Nektar):
         json_data["account"] = author
         json_data["permlink"] = permlink
         json_data["notes"] = notes
-        operation = ["mutePost", json_data]
+        operation = ["flagPost", json_data]
         data["json"] = json.dumps(operation).replace("'", '\\"')
 
         ref_block_num, ref_block_prefix = self.get_reference_block_data()
@@ -1148,15 +1499,6 @@ class Swarm(Nektar):
             "extensions": [],
         }
         return self._broadcast(transaction, synchronous, strict, verify_only)
-
-    def mark_spam(self, author, permlink):
-        """Muting post but noted as `spam` as standardized label for spams.
-
-        :param author: a valid blockchain account username
-        :param permlink: actual permlink to the specified author
-
-        """
-        self.mute(author, permlink, "spam")
 
 
 ##############################

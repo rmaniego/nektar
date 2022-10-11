@@ -23,12 +23,14 @@ This is compatible with Python 3.9 or later.
 **3.** Highly costumizable via `appbase` module. <br>
 
 ## Nektar Module
+Contains the Waggle, Swarm, and Drone classes.
+
+## Waggle Class 
+Methods for blogging and engagement
 **Import Module**
 ```python
 from nektar import Waggle
-
-# leverage json to `beautify` purpose only
-import json
+import json # leverage json to `beautify` purpose only
 ```
 
 **Basic Setup**
@@ -65,6 +67,13 @@ username = "hive-nektar"
 
 wifs = { "active": "5*" }
 hive = Waggle(username, wifs=wifs)
+
+```
+
+**Initialize with Custom Parmeters**
+```python
+
+hive = Waggle("valid-username", wifs=wifs, timeout=25, retries=1, warning=True)
 
 ```
 
@@ -374,17 +383,178 @@ verified = hive.verify_authority(signed_transaction)
 print("OK:", verified)
 ```
 
+## Swarm Class 
+Community Management methods
+```python
+counter += 1
+## Initialize Swarm class")
+hive = Swarm("hive-*", "valid-username", wif="5*", role="posting")
+
+## Initialize Swarm class with dictionary of WIFs
+hive = Swarm("hive-*", "valid-username", wifs=wifs)
+
+## Initialize Swarm class with app and version")
+hive = Swarm("hive-*", "valid-username", app="nektar.app", version="2022.10.05")
+
+## Initialize Swarm class with custom parameters")
+hive = Swarm("hive-*", "valid-username", wifs=wifs, timeout=25, retries=1, warning=True)
+
+## Mute a post
+hive.mute("valid-username", "valid-permlink", "Offtopic")
+print("Transaction: " + json.dumps(hive.appbase.signed_transaction, indent=2))
+
+## Unmute a post - option 1
+hive.mute("valid-username", "valid-permlink", "Offtopic", mute=False)
+print("Transaction: " + json.dumps(hive.appbase.signed_transaction, indent=2))
+
+## Unmute a post - option 2
+hive.unmute("valid-username", "valid-permlink", "On topic, apologies")
+print("Transaction: " + json.dumps(hive.appbase.signed_transaction, indent=2))
+
+## Mark post as spam
+hive.mark_spam("valid-username", "valid-permlink")
+print("Transaction: " + json.dumps(hive.appbase.signed_transaction, indent=2))
+
+## Update community properties
+title = "Community Name"
+about = "About information"
+is_nsfw = False
+description = "This is a description"
+flag_text = "..."
+hive.update(title, about, is_nsfw, description, flag_text)
+print("Transaction: " + json.dumps(hive.appbase.signed_transaction, indent=2))
+
+## Subscribe to a community
+hive.subscribe()
+print("Transaction: " + json.dumps(hive.appbase.signed_transaction, indent=2))
+
+## Unsubscribe to a community - option 1
+hive.subscribe(subscribe=False)
+print("Transaction: " + json.dumps(hive.appbase.signed_transaction, indent=2))
+
+## Unsubscribe to a community - option 2
+hive.unsubscribe()
+print("Transaction: " + json.dumps(hive.appbase.signed_transaction, indent=2))
+
+## Pin a post
+hive.pin("valid-username", "valid-permlink")
+print("Transaction: " + json.dumps(hive.appbase.signed_transaction, indent=2))
+
+## Unpin a post - option 1
+hive.pin("valid-username", "valid-permlink", pin=False)
+print("Transaction: " + json.dumps(hive.appbase.signed_transaction, indent=2))
+
+## Unpin a post - option 2
+hive.unpin("valid-username", "valid-permlink")
+print("Transaction: " + json.dumps(hive.appbase.signed_transaction, indent=2))
+
+## Flag a post
+hive.flag("valid-username", "valid-permlink", "flagging post for reason...")
+print("Transaction: " + json.dumps(hive.appbase.signed_transaction, indent=2))
+```
+
 ## AppBase Module
 **Basic Usage**
 ```python
 from appbase import AppBase
 
-hive = AppBase(username)
-hive.append_wif("5*")
 
-props = hive.api("database").get_dynamic_global_properties({})
 
-username = "nektar"
-account = hive.api("condenser").get_accounts([[self.username]])
+## Initialize AppBase Class
+hive = AppBase()
+
+## Initialize AppBase Class with custom parameters
+custom_nodes = ["rpc.mock.site"]
+hive = AppBase(nodes=custom_nodes, timeout=5, retries=1, warning=True)
+
+## Change to custom nodes
+hive.custom_nodes(custom_nodes)
+
+## Add new WIF and equivalent role
+hive.append_wif(wif="5*", role="posting")
+hive.append_wif(wif="5*", role="active")
+
+## Add new dictionary of roles and their equivalent WIFs
+wifs = {"posting": "5*", "active": "5*"}
+hive.append_wif(wifs)
+
+## Change retries to custom value
+hive.set_timeout(15)
+
+## Read the actual Hive API documentation for proper guidance
+## https://developers.hive.io/apidefinitions/
+
+## Access API and its methods - generic
+hive.api("condenser")
+hive.api("condenser_api")
+
+## `account_by_key_api.get_key_references`
+# version = hive.api("account_by_key_api").*
+params = {"keys": "STM*"]}
+data = hive.account_by_key().get_key_references(params)
+print("Account by public key: " + json.dumps(data, indent=2))
+
+## `bridge.get_profile`
+# version = hive.api("bridge").*
+params = {"account": "valid-username1", "observer": "valid-username2"}
+data = hive.bridge().get_profile(params)
+print("Profile: " + json.dumps(data, indent=2))
+
+## `account_history_api.get_account_history`
+# version = hive.api("account_history").*
+params = {
+    "account": "valid-username",
+    "start": 1000,
+    "limit": 1000,
+    "include_reversible": True,
+    "operation_filter_low": 0,
+    "operation_filter_high": 1,
+}
+data = hive.account_history().get_account_history(params)
+print("Account history: " + json.dumps(data, indent=2))
+
+## `block_api.get_block`
+params = {"block_num": 8675309}
+data = hive.block().get_block(params)
+print("Block: " + json.dumps(data, indent=2))
+
+## Create an instance for specific API only.
+condenser = hive.condenser()
+
+params = "valid-username", "valid-permlink"]
+data = condenser.get_content(params)
+print("Content #1: " + json.dumps(data, indent=2))
+
+params = "valid-username", 0, 10]
+data = condenser.get_blog(params)
+print("Content #2: " + json.dumps(data, indent=2))
+
+## Using the `request` method
+method = "rc_api.find_rc_accounts"
+params = {"accounts": "valid-username"]}
+data = hive.request(method, params, strict=False)
+print("Accounts: " + json.dumps(data, indent=2))
+
+## Using the `broadcast` method - `condenser_api`
+method = "condenser_api.get_transaction_hex"
+transaction = {
+    "ref_block_num": 123456,
+    "ref_block_prefix": 1234567890,
+    "expiration": "2022-10-05T18:00:00",
+    "operations": [
+        [
+            "vote",
+            {
+                "voter": "valid-username1",
+                "author": "valid-username2",
+                "permlink": "valid-permlink",
+                "weight": 10000,
+            },
+        ]
+    ],
+    "extensions": [],
+}
+data = hive.broadcast(method, transaction, strict=False)
+print("Transaction hex: " + data)
 
 ```
