@@ -86,7 +86,9 @@ class Nektar:
 
     def refresh(self):
         """Get a more recent version of the account data."""
-        self.account = self.appbase.condenser().get_accounts([[self.username]])[0]
+        data = self.appbase.condenser().get_accounts([[self.username]])
+        if data:
+            self.account = data[0]
 
     def resource_credits(self, account=None):
         """Get the current resource credits of an account.

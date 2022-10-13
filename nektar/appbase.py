@@ -335,7 +335,7 @@ class AppBase:
         result = self._send_request(payload, strict)
         if method == "condenser_api.broadcast_transaction" and not strict:
             ## not working
-            return self.api("condenser_api").get_transaction([transaction_id])
+            return self.api("condenser_api").get_transaction([self._transaction_id])
         return result
 
     def _serialize(self, transaction):
