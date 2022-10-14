@@ -184,6 +184,21 @@ percentage = hive.manabar("valid-account")
 print("Current Mana: " + str(int(percentage)) + "%")
 ```
 
+**Get Account Reputation** 
+```python
+## reputation of the initialized account
+reputation = hive.reputation(score=False)
+print("Reputation: " + str(reputation))
+
+## reputation of the initialized account, converted to score
+score = hive.reputation()
+print("Reputation score: " + str(score))
+
+## specify another account, converted to score
+score = hive.reputation(account="valid-username")
+print("Reputation score: " + str(score))
+```
+
 **Get the List of Followers** 
 ```python
 

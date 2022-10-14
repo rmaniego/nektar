@@ -11,6 +11,7 @@
 
 import re
 import json
+import math
 import time
 import struct
 from datetime import datetime, timezone
@@ -118,9 +119,30 @@ class Nektar:
         :param account: a valid Hive account username, default = initizalized account (Default value = None)
 
         """
-
+        
         data = self.resource_credits(account)
         return (int(data["rc_manabar"]["current_mana"]) / int(data["max_rc"])) * 100
+    
+    def reputation(self, account=None, score=True):
+        """Returns the current manabar precentage.
+
+        :param account: a valid Hive account username, default = initizalized account (Default value = None)
+
+        """
+        value = int(self.account["reputation"])
+        if account:
+            data = self.appbase.condenser().get_accounts([[account]])
+            if not data:
+                raise NektarException(
+                    "`account` must be a valid Hive account username."
+                )
+            value = int(data[0]["reputation"])
+        if not score:
+            return value
+        result = ((math.log10(abs(value)) - 9) * 9) + 25
+        if value < 0:
+            return -result
+        return result
 
     def get_config(self, field=None, fallback=None):
         """Get low-level blockchain constants.
