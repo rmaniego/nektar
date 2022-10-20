@@ -317,6 +317,7 @@ ROLES = {
     "all": ["owner", "active", "posting", "memo"],
     "comment": ["owner", "active", "posting"],
     "vote": ["owner", "active", "posting"],
+    "transfer_to_savings": ["owner", "active"],
     "transfer": ["owner", "active"],
     "custom_json": ["active"],
     "owner": ["owner"],

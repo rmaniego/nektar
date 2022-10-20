@@ -1002,6 +1002,7 @@ class Waggle(Nektar):
         amount,
         asset,
         message,
+        to_savings=False,
         expire=30,
         synchronous=False,
         strict=True,
@@ -1013,30 +1014,36 @@ class Waggle(Nektar):
         :param amount: any positive value
         :param asset: asset type to send, `HBD` or `HIVE` only
         :param message: any UTF-8 string up to 2048 bytes only
+        :param to_savings: transfer to savings if True (Default = False)
         :param expire: transaction expiration in seconds (Default value = 30)
         :param synchronous: broadcasting method (Default value = False)
         :param strict: flag to cause exception upon encountering an error (Default value = True)
         :param verify_only: flag to verify required authority or to fully complete the broadcast operation (Default value = False)
 
         """
+        
+        operation = "transfer"
+        to_savings = _true_or_false(to_savings, False)
+        if to_savings:
+            operation = "transfer_to_savings"
 
-        if not _check_wifs(self.roles, "transfer"):
+        if not _check_wifs(self.roles, operation):
             raise NektarException(
-                "The `transfer` operation requires"
-                "one of the following private keys:" + ", ".join(ROLES["transfer"])
+                f"The `{operation}` operation requires"
+                "one of the following private keys:" + ", ".join(ROLES[operation])
             )
 
         data = {}
         data["from"] = self.username
         if not isinstance(receiver, str):
             raise NektarException("Receiver must be a valid Hive account user.")
-        if self.username == receiver:
+        if not to_savings and (self.username == receiver):
             raise NektarException("Receiver must be unique from the sender.")
         data["to"] = receiver
 
         if not isinstance(amount, (int, float)):
             raise NektarException("Amount must be a positive numeric value.")
-        if amount <= 0:
+        if amount <= 0.001:
             raise NektarException("Amount must be a positive numeric value.")
         asset = asset.upper()
         if asset not in ("HBD", "HIVE"):
@@ -1060,7 +1067,7 @@ class Waggle(Nektar):
         strict = _true_or_false(strict, True)
         verify_only = _true_or_false(verify_only, False)
 
-        operations = [["transfer", data]]
+        operations = [[operation, data]]
         transaction = {
             "ref_block_num": ref_block_num,
             "ref_block_prefix": ref_block_prefix,
@@ -1070,6 +1077,32 @@ class Waggle(Nektar):
         }
 
         return self._broadcast(transaction, synchronous, strict, verify_only)
+
+    def transfer_to_savings(
+        self,
+        receiver,
+        amount,
+        asset,
+        message,
+        expire=30,
+        synchronous=False,
+        strict=True,
+        verify_only=False,
+    ):
+        """For time locked savings accounts.
+
+        :param receiver: a valid Hive account username
+        :param amount: any positive value
+        :param asset: asset type to send, `HBD` or `HIVE` only
+        :param message: any UTF-8 string up to 2048 bytes only
+        :param expire: transaction expiration in seconds (Default value = 30)
+        :param synchronous: broadcasting method (Default value = False)
+        :param strict: flag to cause exception upon encountering an error (Default value = True)
+        :param verify_only: flag to verify required authority or to fully complete the broadcast operation (Default value = False)
+
+        """
+        
+        return self.memo(receiver, amount, asset, message, to_savings=True, expire=expire, synchronous=synchronous, strict=strict, verify_only=verify_only)
 
 
 class Swarm(Nektar):
