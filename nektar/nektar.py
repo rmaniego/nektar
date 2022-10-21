@@ -567,12 +567,11 @@ class Waggle(Nektar):
             try:
                 result = self.appbase.condenser().get_account_history(params)
             except:
-                if params[1] == -1:
-                    break
                 params[1] -= 1000
+                continue
             for item in result:
                 if params[1] == -1:
-                    params[1] = ((item[0] // 1000) * 1000) - 2000
+                    params[1] = ((item[0] // 1000) * 1000)
                 if item[0] < params[1]:
                     params[1] = ((item[0] // 1000) * 1000) - 1000
                 delegator = item[1]["op"][1]["delegator"]
@@ -618,12 +617,11 @@ class Waggle(Nektar):
             try:
                 result = self.appbase.condenser().get_account_history(params)
             except:
-                if params[1] == -1:
-                    break
                 params[1] -= 1000
+                continue
             for item in result:
                 if params[1] == -1:
-                    params[1] = ((item[0] // 1000) * 1000) - 2000
+                    params[1] = ((item[0] // 1000) * 1000)
                 if item[0] < params[1]:
                     params[1] = ((item[0] // 1000) * 1000) - 1000
                 delegatee = item[1]["op"][1]["delegatee"]
