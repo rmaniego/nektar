@@ -980,6 +980,37 @@ class Waggle(Nektar):
             if len(data):
                 return data
         return {}
+    
+    def reblogs(self, author, permlink, retries=1):
+        """Returns a list of authors that have reblogged a post.
+
+        :param author: username of author of the blog post being accessed
+        :param permlink: permlink to the blog post being accessed
+        :param retries: number of times to check the existence of the post, must be between 1-5 (Default value = 1)
+
+        """
+
+        params = ["", ""]
+        if not isinstance(author, str):
+            raise NektarException("Author must be a string.")
+        pattern = r"[\w][\w\.\-]{2,15}"
+        if not len(re.findall(pattern, author)):
+            raise NektarException("author must be a string of length 3 - 16.")
+        params[0] = author
+        pattern = r"[\w][\w\-\%]{0,255}"
+        if not len(re.findall(pattern, permlink)):
+            raise NektarException("permlink must be a valid url-escaped string.")
+        params[1] = permlink
+
+        if not (1 <= int(retries) <= 5):
+            raise NektarException("Retries must be between 1 to 5 times.")
+        strict = (retries == 1)
+
+        for _ in range(retries):
+            data = self.appbase.condenser().get_reblogged_by(params, strict=strict)
+            if len(data):
+                return data
+        return []
 
     def vote(
         self,
