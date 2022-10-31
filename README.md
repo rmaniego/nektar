@@ -298,8 +298,9 @@ for blog in blogs:
         print(key + ":", value)
 ```
 
-**Access a Blog Post/Comment** 
+**Access a Blog Post/Comment (Bridge API)** 
 If the post or comment does not exists in the blockchain, it will return an empty dictionary.
+
 ```python
 
 author = "valid-username"
@@ -312,11 +313,31 @@ permlink = "test-permlink-abc-123-def-456"
 data = hive.get_post(author, permlink, retries=5)
 if not data:
     print("The post is not yet in the blockchain.")
+print(json.dumps(data, indent=2))
+```
+
+**Access a Blog Post/Comment (Condenser API)** 
+If the post or comment does not exists in the blockchain, it will return an empty dictionary.
+
+```python
+
+author = "valid-username"
+permlink = "valid-permlink"
+data = hive.get_post(author, permlink)
+print(json.dumps(data, indent=4))
+    
+author = "valid-username"
+permlink = "test-permlink-abc-123-def-456"
+content = hive.get_content(author, permlink, retries=2)
+if not data:
+    print("The post is not yet in the blockchain.")
+print(json.dumps(content, indent=2))
 ```
 
 **Create a Post Programmatically** 
 
 ***WARNING:*** Do NOT abuse Hive, post only quality contents not more than once a day.
+
 ```python
     
 title = "Make Your Title Catchy, But Not ClickBait-y"
@@ -346,6 +367,16 @@ body = "Allows markdown formatted text."
 hive.reply(author, permlink, body)
 ```
 
+**Get all replies on a blog post.** 
+```python
+
+author = ""
+permlink = ""
+
+replies = hive.replies(author, permlink)
+print(json.dumps(replies, indent=2))
+```
+
 **Vote on A Post** 
 ```python
 
@@ -354,6 +385,16 @@ permlink = ""
 weight = 10000  # -10000 to 10000, where 1000 = 100%
 
 hive.vote(author, permlink, weight)
+```
+
+**Get active votes on a blog post.** 
+```python
+
+author = ""
+permlink = ""
+
+votes = hive.votes(author, permlink)
+print(json.dumps(votes, indent=2))
 ```
 
 **Send a Memo** 
