@@ -13,7 +13,7 @@
     :license: MIT License
 """
 
-NEKTAR_VERSION = "0.1.0"
+NEKTAR_VERSION = "0.9.31"
 
 # PublicKey prefix
 PREFIX = "STM"
@@ -354,5 +354,5 @@ NODES = [
     "api.deathwing.me",
     "api.c0ff33a.uk",
     "hive-api.arcange.eu",
-    "api.pharesim.me",
+    # "api.pharesim.me",
 ]

@@ -50,13 +50,21 @@ class Nektar:
         wif=None,
         role=None,
         wifs=None,
+        nodes=None,
+        chain_id=None,
         app=None,
         version=None,
         timeout=10,
         retries=3,
         warning=False,
     ):
-        self.appbase = AppBase(timeout=timeout, retries=retries, warning=warning)
+        self.appbase = AppBase(
+            nodes=nodes,
+            chain_id=chain_id,
+            timeout=timeout,
+            retries=retries,
+            warning=warning,
+        )
         self.set_username(username, wif, role, wifs)
 
         self.account = None
@@ -119,10 +127,10 @@ class Nektar:
         :param account: a valid Hive account username, default = initizalized account (Default value = None)
 
         """
-        
+
         data = self.resource_credits(account)
         return (int(data["rc_manabar"]["current_mana"]) / int(data["max_rc"])) * 100
-    
+
     def reputation(self, account=None, score=True):
         """Returns the current manabar precentage.
 
@@ -310,13 +318,21 @@ class Waggle(Nektar):
         wif=None,
         role=None,
         wifs=None,
+        nodes=None,
+        chain_id=None,
         app=None,
         version=None,
         timeout=10,
         retries=3,
         warning=False,
     ):
-        self.appbase = AppBase(timeout=timeout, retries=retries, warning=warning)
+        self.appbase = AppBase(
+            nodes=nodes,
+            chain_id=chain_id,
+            timeout=timeout,
+            retries=retries,
+            warning=warning,
+        )
         self.set_username(username, wif, role, wifs)
 
         self.account = None
@@ -571,7 +587,7 @@ class Waggle(Nektar):
                 continue
             for item in result:
                 if params[1] == -1:
-                    params[1] = ((item[0] // 1000) * 1000)
+                    params[1] = (item[0] // 1000) * 1000
                 if item[0] < params[1]:
                     params[1] = ((item[0] // 1000) * 1000) - 1000
                 delegator = item[1]["op"][1]["delegator"]
@@ -621,7 +637,7 @@ class Waggle(Nektar):
                 continue
             for item in result:
                 if params[1] == -1:
-                    params[1] = ((item[0] // 1000) * 1000)
+                    params[1] = (item[0] // 1000) * 1000
                 if item[0] < params[1]:
                     params[1] = ((item[0] // 1000) * 1000) - 1000
                 delegatee = item[1]["op"][1]["delegatee"]
@@ -751,7 +767,7 @@ class Waggle(Nektar):
             if len(data):
                 return data
         return {}
-    
+
     def get_content(self, author, permlink, retries=1):
         """Returns the content (post or comment), using the condenser API.
 
@@ -775,7 +791,7 @@ class Waggle(Nektar):
 
         if not (1 <= int(retries) <= 5):
             raise NektarException("Retries must be between 1 to 5 times.")
-        strict = (retries == 1)
+        strict = retries == 1
 
         for _ in range(retries):
             data = self.appbase.condenser().get_content(params, strict=strict)
@@ -949,7 +965,7 @@ class Waggle(Nektar):
             "extensions": [],
         }
         return self._broadcast(transaction, synchronous, strict, verify_only)
-    
+
     def replies(self, author, permlink, retries=1):
         """Returns a list of replies.
 
@@ -973,14 +989,14 @@ class Waggle(Nektar):
 
         if not (1 <= int(retries) <= 5):
             raise NektarException("Retries must be between 1 to 5 times.")
-        strict = (retries == 1)
+        strict = retries == 1
 
         for _ in range(retries):
             data = self.appbase.condenser().get_content_replies(params, strict=strict)
             if len(data):
                 return data
         return {}
-    
+
     def reblogs(self, author, permlink, retries=1):
         """Returns a list of authors that have reblogged a post.
 
@@ -1004,7 +1020,7 @@ class Waggle(Nektar):
 
         if not (1 <= int(retries) <= 5):
             raise NektarException("Retries must be between 1 to 5 times.")
-        strict = (retries == 1)
+        strict = retries == 1
 
         for _ in range(retries):
             data = self.appbase.condenser().get_reblogged_by(params, strict=strict)
@@ -1086,7 +1102,7 @@ class Waggle(Nektar):
             "extensions": [],
         }
         return self._broadcast(transaction, synchronous, strict, verify_only)
-    
+
     def votes(self, author, permlink, retries=1):
         """Returns all votes for the given post.
 
@@ -1110,7 +1126,7 @@ class Waggle(Nektar):
 
         if not (1 <= int(retries) <= 5):
             raise NektarException("Retries must be between 1 to 5 times.")
-        strict = (retries == 1)
+        strict = retries == 1
 
         for _ in range(retries):
             data = self.appbase.condenser().get_active_votes(params, strict=strict)
@@ -1143,7 +1159,7 @@ class Waggle(Nektar):
         :param verify_only: flag to verify required authority or to fully complete the broadcast operation (Default value = False)
 
         """
-        
+
         operation = "transfer"
         to_savings = _true_or_false(to_savings, False)
         if to_savings:
@@ -1223,8 +1239,18 @@ class Waggle(Nektar):
         :param verify_only: flag to verify required authority or to fully complete the broadcast operation (Default value = False)
 
         """
-        
-        return self.memo(receiver, amount, asset, message, to_savings=True, expire=expire, synchronous=synchronous, strict=strict, verify_only=verify_only)
+
+        return self.memo(
+            receiver,
+            amount,
+            asset,
+            message,
+            to_savings=True,
+            expire=expire,
+            synchronous=synchronous,
+            strict=strict,
+            verify_only=verify_only,
+        )
 
 
 class Swarm(Nektar):
@@ -1251,13 +1277,21 @@ class Swarm(Nektar):
         wif=None,
         role=None,
         wifs=None,
+        nodes=None,
+        chain_id=None,
         app=None,
         version=None,
         timeout=10,
         retries=3,
         warning=False,
     ):
-        self.appbase = AppBase(timeout=timeout, retries=retries, warning=warning)
+        self.appbase = AppBase(
+            nodes=nodes,
+            chain_id=chain_id,
+            timeout=timeout,
+            retries=retries,
+            warning=warning,
+        )
         self.set_username(username, wif, role, wifs)
 
         self.account = None

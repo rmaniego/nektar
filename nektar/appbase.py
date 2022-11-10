@@ -35,7 +35,9 @@ class AppBase:
 
     """
 
-    def __init__(self, nodes=None, api=None, timeout=10, retries=3, warning=False):
+    def __init__(
+        self, nodes=None, api=None, chain_id=None, timeout=10, retries=3, warning=False
+    ):
 
         # set default to condenser api
         self._appbase_api = self.api(api)
@@ -73,7 +75,9 @@ class AppBase:
         self.custom_nodes(nodes)
 
         self.wifs = {}
-        self.chain_id = self.api("database").get_version({})["chain_id"]
+        self.chain_id = chain_id
+        if not isinstance(self.chain_id, str):
+            self.chain_id = self.api("database").get_version({})["chain_id"]
         self._transaction_id = None
         self.signed_transaction = None
 

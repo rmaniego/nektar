@@ -73,7 +73,9 @@ hive = Waggle(username, wifs=wifs)
 **Initialize with Custom Parmeters**
 ```python
 
-hive = Waggle("valid-username", wifs=wifs, timeout=25, retries=1, warning=True)
+custom_nodes = ["testnet.openhive.network"]
+CHAIN_ID_TESTNET = "18dcf0a285365fc58b71f18b3d3fec954aa0c141c44e4e5cb4cf777b9eab274e"
+hive = Waggle("valid-username", wifs=wifs, nodes=custom_nodes, chain_id=CHAIN_ID_TESTNET, timeout=25, retries=1, warning=True)
 
 ```
 
@@ -377,6 +379,16 @@ replies = hive.replies(author, permlink)
 print(json.dumps(replies, indent=2))
 ```
 
+**Get all accounts who reblogged the blog post.** 
+```python
+
+author = ""
+permlink = ""
+
+accounts = hive.reblogs(author, permlink)
+print("Reblogged by: " + ", ".join(accounts))
+```
+
 **Vote on A Post** 
 ```python
 
@@ -514,14 +526,15 @@ print("Transaction: " + json.dumps(hive.appbase.signed_transaction, indent=2))
 ```python
 from appbase import AppBase
 
-
+CHAIN_ID_MAINNET = "beeab0de00000000000000000000000000000000000000000000000000000000"
+CHAIN_ID_TESTNET = "18dcf0a285365fc58b71f18b3d3fec954aa0c141c44e4e5cb4cf777b9eab274e"
 
 ## Initialize AppBase Class
 hive = AppBase()
 
 ## Initialize AppBase Class with custom parameters
-custom_nodes = ["rpc.mock.site"]
-hive = AppBase(nodes=custom_nodes, timeout=5, retries=1, warning=True)
+custom_nodes = ["testnet.openhive.network"]
+hive = AppBase(nodes=custom_nodes, chain_id=CHAIN_ID_TESTNET, timeout=5, retries=1, warning=True)
 
 ## Change to custom nodes
 hive.custom_nodes(custom_nodes)
