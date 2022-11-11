@@ -16,7 +16,7 @@ import struct
 import hashlib
 from binascii import hexlify, unhexlify
 
-from .keys import PrivateKey
+from .base58 import Base58
 
 
 def sign_transaction(chain_id, serialized_transaction, wifs):
@@ -38,7 +38,7 @@ def sign_transaction(chain_id, serialized_transaction, wifs):
     signatures = []
     for wif in wifs:
         i = 0
-        p = as_bytes(PrivateKey(wif))
+        p = Base58(wif).__bytes__()
         sk = ecdsa.SigningKey.from_string(p, curve=ecdsa.SECP256k1)
         while True:
             k = ecdsa.rfc6979.generate_k(
@@ -81,8 +81,7 @@ def recover_pubkey_parameter(digest, signature, pubkey):
         p = pk.pubkey.point
         order = pk.curve.generator.order()
         x = ecdsa.util.number_to_string(p.x(), order)
-        compressed_pk = as_bytes(chr(2 + (p.y() & 1)), "ascii") + x
-
+        compressed_pk = bytes(chr(2 + (p.y() & 1)), "ascii") + x
         if pubkey.to_string() in (pk.to_string(), compressed_pk):
             return i
     return None
@@ -114,17 +113,3 @@ def recover_public_key(digest, signature, i):
     ):
         return None
     return ecdsa.VerifyingKey.from_public_point(Q, curve=ecdsa.SECP256k1)
-
-
-def as_bytes(item, encoding=None):
-    """
-
-    :param item:
-    :param encoding:  (Default value = None)
-
-    """
-    if hasattr(item, "__bytes__"):
-        return item.__bytes__()
-    if encoding:
-        return bytes(item, encoding)
-    return bytes(item)

@@ -194,32 +194,59 @@ class Nektar:
         ref_block_prefix = struct.unpack_from("<I", unhexlify(previous), 4)[0]
         return ref_block_num, ref_block_prefix
 
+    def verify_authority(self, transaction):
+        """Returns true if the transaction has all of the required signatures.
+
+        :param transaction: a valid transaction data
+
+        """
+        return self.appbase.condenser().verify_authority(transaction, strict=False)
+
+    def _broadcast(
+        self, transaction, synchronous=False, strict=True, debug=False
+    ):
+        """Processes the transaction for broadcasting into the blockchain.
+
+        :param transaction: the formatted transaction based on the API method
+        :param synchronous: broadcasting     method (Default value = False)
+        :param strict: flag to cause exception upon encountering an error (Default value = True)
+        :param debug: flag to disable completion of the broadcast operation (Default value = False)
+
+        """
+        method = "condenser_api.broadcast_transaction"
+        if synchronous:
+            method = "condenser_api.broadcast_transaction_synchronous"
+            result = self.appbase.broadcast(method, transaction, strict, debug)
+            if result:
+                return result
+        return self.appbase.broadcast(method, transaction, strict, debug)
+
     def custom_json(
         self,
-        json_id,
-        json_data,
-        required_auths,
-        required_posting_auths,
+        id_,
+        jdata,
+        required_auths=[],
+        required_posting_auths=[],
         expire=30,
         synchronous=False,
         strict=True,
-        verify_only=False,
+        debug=False,
     ):
         """Provides a generic way to add higher level protocols.
 
-        :param json_id: a valid string in a lowercase and (snake_case or kebab-case) format
-        :param json_data: any valid JSON data
+        :param id_: a valid string in a lowercase and (snake_case or kebab-case) format
+        :param jdata: any valid JSON data
         :param required_auths: list of usernames required to sign with private keys
         :param required_posting_auths: list of usernames required to sign with a `posting` private key
         :param expire: transaction expiration in seconds (Default value = 30)
-        :param synchronous: broadcasting method (Default value = False)
+        :param synchronous: flah to broadcasting method synchronously (Default value = False)
         :param strict: flag to cause exception upon encountering an error (Default value = True)
-        :param verify_only: flag to verify required authority or to fully complete the broadcast operation (Default value = False)
+        :param debug: flag to disable completion of the broadcast operation (Default value = False)
 
         """
 
         data = {}
-        roles = "posting"  # initial required role
+        role = "posting"  # initial required role
 
         if not isinstance(required_auths, list):
             raise NektarException(
@@ -230,11 +257,11 @@ class Nektar:
         # if required auths is not empty, include owner,
         # active and posting roles
         if len(required_auths):
-            roles = "custom_json"
-        if not _check_wifs(self.roles, roles):
+            role = "custom_json"
+        if not _check_wifs(self.roles, role):
             raise NektarException(
                 "The `custom_json` operation requires"
-                "one of the following private keys:" + ", ".join(ROLES[roles])
+                "one of the following private keys:" + ", ".join(ROLES[role])
             )
 
         if not isinstance(required_posting_auths, list):
@@ -243,15 +270,15 @@ class Nektar:
             )
         data["required_posting_auths"] = required_posting_auths
 
-        if len(re.findall(r"[^\w\-]+", json_id)):
+        if len(re.findall(r"[^\w\-]+", id_)):
             raise NektarException(
                 "Custom JSON id must be a valid string preferrably in lowercase and (snake_case or kebab-case) format."
             )
-        data["id"] = json_id
+        data["id"] = id_
 
-        if not isinstance(json_data, dict):
+        if not isinstance(jdata, (list, dict)):
             raise NektarException("Custom JSON must be in dictionary format.")
-        data["json"] = json.dumps(json_data).replace("'", '\\"')
+        data["json"] = json.dumps(jdata).replace("'", '\\"')
 
         ref_block_num, ref_block_prefix = self.get_reference_block_data()
         expire = _within_range(expire, 5, 120, 30)
@@ -268,32 +295,154 @@ class Nektar:
         }
         return self._broadcast(transaction, synchronous)
 
-    def verify_authority(self, transaction):
-        """Returns true if the transaction has all of the required signatures.
-
-        :param transaction: a valid transaction data
-
-        """
-        return self.appbase.condenser().verify_authority(transaction, strict=False)
-
-    def _broadcast(
-        self, transaction, synchronous=False, strict=True, verify_only=False
+    def memo(
+        self,
+        receiver,
+        amount,
+        asset,
+        message="",
+        to=None,
+        expire=30,
+        synchronous=False,
+        strict=True,
+        debug=False,
     ):
-        """Processes the transaction for broadcasting into the blockchain.
+        """Transfers asset from one account to another, precision is auto-adjusted based on the specified asset.
 
-        :param transaction: the formatted transaction based on the API method
-        :param synchronous: broadcasting     method (Default value = False)
+        :param receiver: a valid Hive account username
+        :param amount: any positive value
+        :param asset: asset type to send, `HBD` or `HIVE` only
+        :param message: any UTF-8 string up to 2048 bytes only
+        :param to: transfer to `None`, `savings`, or `vesting` (Default = None)
+        :param expire: transaction expiration in seconds (Default value = 30)
+        :param synchronous: flah to broadcasting method synchronously (Default value = False)
         :param strict: flag to cause exception upon encountering an error (Default value = True)
-        :param verify_only: flag to verify required authority or to fully complete the broadcast operation (Default value = False)
+        :param debug: flag to disable completion of the broadcast operation (Default value = False)
 
         """
-        method = "condenser_api.broadcast_transaction"
-        if synchronous:
-            method = "condenser_api.broadcast_transaction_synchronous"
-            result = self.appbase.broadcast(method, transaction, strict, verify_only)
-            if result:
-                return result
-        return self.appbase.broadcast(method, transaction, strict, verify_only)
+        
+        asset = asset.upper()
+        if asset not in ("HBD", "HIVE"):
+            raise NektarException("Memo only accepts transfer of HBD and HIVE assets.")
+
+        operations = [["transfer", {}]]
+        if to is not None:
+            if to not in ("savings", "vesting"):
+                raise NektarException("Value of `to` must be `None`, `savings`, or `vesting` only.")
+            if to == "vesting" and asset != "HIVE":
+                raise NektarException("Transfer to vesting only accepts transfer of HIVE asset only.")
+            operations[0][0] = "transfer_to_" + to
+
+        data = {}
+        data["from"] = self.username
+        if not isinstance(receiver, str):
+            raise NektarException("Receiver must be a valid Hive account user.")
+        if to is None and (self.username == receiver):
+            raise NektarException("Receiver must be unique from the sender.")
+        data["to"] = receiver
+
+        if not isinstance(amount, (int, float)):
+            raise NektarException("Amount must be a positive numeric value.")
+        if amount < 0.001:
+            raise NektarException("Amount must be a positive numeric value.")
+
+        precision = ASSETS[asset]["precision"]
+        whole, fraction = str(float(amount)).split(".")
+        fraction = fraction.ljust(precision, "0")[:precision]
+        data["amount"] = whole + "." + fraction + " " + asset
+
+        if to != "vesting":
+            if not isinstance(message, str):
+                raise NektarException("Memo message must be a UTF-8 string.")
+            if not (len(message.encode("utf-8")) <= 2048):
+                raise NektarException("Memo message must be not more than 2048 bytes.")
+            data["memo"] = message
+        operations[0][1] = data
+
+        ref_block_num, ref_block_prefix = self.get_reference_block_data()
+        expire = _within_range(expire, 5, 120, 30)
+        expiration = _make_expiration(expire)
+        synchronous = _true_or_false(synchronous, False)
+        strict = _true_or_false(strict, True)
+        debug = _true_or_false(debug, False)
+
+        transaction = {
+            "ref_block_num": ref_block_num,
+            "ref_block_prefix": ref_block_prefix,
+            "expiration": expiration,
+            "operations": operations,
+            "extensions": [],
+        }
+
+        return self._broadcast(transaction, synchronous, strict, debug)
+
+    def transfer_to_savings(
+        self,
+        receiver,
+        amount,
+        asset,
+        message="",
+        expire=30,
+        synchronous=False,
+        strict=True,
+        debug=False,
+    ):
+        """For time locked savings accounts.
+
+        :param receiver: a valid Hive account username
+        :param amount: any positive value
+        :param asset: asset type to send, `HBD` or `HIVE` only
+        :param message: any UTF-8 string up to 2048 bytes only
+        :param expire: transaction expiration in seconds (Default value = 30)
+        :param synchronous: flah to broadcasting method synchronously (Default value = False)
+        :param strict: flag to cause exception upon encountering an error (Default value = True)
+        :param debug: flag to disable completion of the broadcast operation (Default value = False)
+
+        """
+
+        return self.memo(
+            receiver,
+            amount,
+            asset,
+            message,
+            to="savings",
+            expire=expire,
+            synchronous=synchronous,
+            strict=strict,
+            debug=debug,
+        )
+
+    def transfer_to_vesting(
+        self,
+        receiver,
+        amount,
+        expire=30,
+        synchronous=False,
+        strict=True,
+        debug=False,
+    ):
+        """For time locked savings accounts.
+
+        :param receiver: a valid Hive account username
+        :param amount: any positive value
+        :param message: any UTF-8 string up to 2048 bytes only
+        :param expire: transaction expiration in seconds (Default value = 30)
+        :param synchronous: flah to broadcasting method synchronously (Default value = False)
+        :param strict: flag to cause exception upon encountering an error (Default value = True)
+        :param debug: flag to disable completion of the broadcast operation (Default value = False)
+
+        """
+        
+        asset = "HIVE"
+        return self.memo(
+            receiver,
+            amount,
+            asset,
+            to="vesting",
+            expire=expire,
+            synchronous=synchronous,
+            strict=strict,
+            debug=debug)
 
 
 class Waggle(Nektar):
@@ -809,7 +958,7 @@ class Waggle(Nektar):
         expire=30,
         synchronous=False,
         strict=True,
-        verify_only=False,
+        debug=False,
     ):
         """Broadcast a new post to the blockchain
 
@@ -819,9 +968,9 @@ class Waggle(Nektar):
         :param tags: a space separated list of tags (Default value = None)
         :param community: the community to post e.g. `hive-*` (Default value = None)
         :param expire: transaction expiration in seconds (Default value = 30)
-        :param synchronous: broadcasting method (Default value = False)
+        :param synchronous: flah to broadcasting method synchronously (Default value = False)
         :param strict: flag to cause exception upon encountering an error (Default value = True)
-        :param verify_only: flag to verify required authority or to fully complete the broadcast operation (Default value = False)
+        :param debug: flag to disable completion of the broadcast operation (Default value = False)
 
         """
 
@@ -882,7 +1031,7 @@ class Waggle(Nektar):
         expire = _within_range(expire, 5, 120, 30)
         synchronous = _true_or_false(synchronous, False)
         strict = _true_or_false(strict, True)
-        verify_only = _true_or_false(verify_only, False)
+        debug = _true_or_false(debug, False)
 
         operations = [["comment", data]]
         transaction = {
@@ -892,7 +1041,7 @@ class Waggle(Nektar):
             "operations": operations,
             "extensions": [],
         }
-        return self._broadcast(transaction, synchronous, strict, verify_only)
+        return self._broadcast(transaction, synchronous, strict, debug)
 
     def reply(
         self,
@@ -902,7 +1051,7 @@ class Waggle(Nektar):
         expire=30,
         synchronous=False,
         strict=True,
-        verify_only=False,
+        debug=False,
     ):
         """Broadcast a new comment to a post.
 
@@ -910,9 +1059,9 @@ class Waggle(Nektar):
         :param permlink: permlink to the blog post being replied to
         :param body: the content of the comment
         :param expire: transaction expiration in seconds (Default value = 30)
-        :param synchronous: broadcasting method (Default value = False)
+        :param synchronous: flah to broadcasting method synchronously (Default value = False)
         :param strict: flag to cause exception upon encountering an error (Default value = True)
-        :param verify_only: flag to verify required authority or to fully complete the broadcast operation (Default value = False)
+        :param debug: flag to disable completion of the broadcast operation (Default value = False)
 
         """
 
@@ -954,7 +1103,7 @@ class Waggle(Nektar):
         expire = _within_range(expire, 5, 120, 30)
         synchronous = _true_or_false(synchronous, False)
         strict = _true_or_false(strict, True)
-        verify_only = _true_or_false(verify_only, False)
+        debug = _true_or_false(debug, False)
 
         operations = [["comment", data]]
         transaction = {
@@ -964,7 +1113,7 @@ class Waggle(Nektar):
             "operations": operations,
             "extensions": [],
         }
-        return self._broadcast(transaction, synchronous, strict, verify_only)
+        return self._broadcast(transaction, synchronous, strict, debug)
 
     def replies(self, author, permlink, retries=1):
         """Returns a list of replies.
@@ -1037,7 +1186,7 @@ class Waggle(Nektar):
         expire=30,
         synchronous=False,
         strict=True,
-        verify_only=False,
+        debug=False,
     ):
         """Perform vote on a blog post or comment.
 
@@ -1046,9 +1195,9 @@ class Waggle(Nektar):
         :param weight: vote weight between -10000 to 10000 (Default value = 10000)
         :param percent: override vote weight with percentage (Default value = None)
         :param expire: transaction expiration in seconds (Default value = 30)
-        :param synchronous: broadcasting method (Default value = False)
+        :param synchronous: flah to broadcasting method synchronously (Default value = False)
         :param strict: flag to cause exception upon encountering an error (Default value = True)
-        :param verify_only: flag to verify required authority or to fully complete the broadcast operation (Default value = False)
+        :param debug: flag to disable completion of the broadcast operation (Default value = False)
 
         """
 
@@ -1081,7 +1230,7 @@ class Waggle(Nektar):
         expiration = _make_expiration(expire)
         synchronous = _true_or_false(synchronous, False)
         strict = _true_or_false(strict, True)
-        verify_only = _true_or_false(verify_only, False)
+        debug = _true_or_false(debug, False)
 
         operations = [
             [
@@ -1101,7 +1250,7 @@ class Waggle(Nektar):
             "operations": operations,
             "extensions": [],
         }
-        return self._broadcast(transaction, synchronous, strict, verify_only)
+        return self._broadcast(transaction, synchronous, strict, debug)
 
     def votes(self, author, permlink, retries=1):
         """Returns all votes for the given post.
@@ -1133,123 +1282,24 @@ class Waggle(Nektar):
             if len(data):
                 return data
         return {}
-
-    def memo(
+    
+    def power_up(
         self,
         receiver,
         amount,
-        asset,
-        message,
-        to_savings=False,
         expire=30,
         synchronous=False,
         strict=True,
-        verify_only=False,
+        debug=False,
     ):
-        """Transfers asset from one account to another, precision is auto-adjusted based on the specified asset.
-
-        :param receiver: a valid Hive account username
-        :param amount: any positive value
-        :param asset: asset type to send, `HBD` or `HIVE` only
-        :param message: any UTF-8 string up to 2048 bytes only
-        :param to_savings: transfer to savings if True (Default = False)
-        :param expire: transaction expiration in seconds (Default value = 30)
-        :param synchronous: broadcasting method (Default value = False)
-        :param strict: flag to cause exception upon encountering an error (Default value = True)
-        :param verify_only: flag to verify required authority or to fully complete the broadcast operation (Default value = False)
-
-        """
-
-        operation = "transfer"
-        to_savings = _true_or_false(to_savings, False)
-        if to_savings:
-            operation = "transfer_to_savings"
-
-        if not _check_wifs(self.roles, operation):
-            raise NektarException(
-                f"The `{operation}` operation requires"
-                "one of the following private keys:" + ", ".join(ROLES[operation])
-            )
-
-        data = {}
-        data["from"] = self.username
-        if not isinstance(receiver, str):
-            raise NektarException("Receiver must be a valid Hive account user.")
-        if not to_savings and (self.username == receiver):
-            raise NektarException("Receiver must be unique from the sender.")
-        data["to"] = receiver
-
-        if not isinstance(amount, (int, float)):
-            raise NektarException("Amount must be a positive numeric value.")
-        if amount <= 0.001:
-            raise NektarException("Amount must be a positive numeric value.")
-        asset = asset.upper()
-        if asset not in ("HBD", "HIVE"):
-            raise NektarException("Memo only accepts transfer of HBD and HIVE assets.")
-
-        precision = ASSETS[asset]["precision"]
-        whole, fraction = str(float(amount)).split(".")
-        fraction = fraction.ljust(precision, "0")[:precision]
-        data["amount"] = whole + "." + fraction + " " + asset
-
-        if not isinstance(message, str):
-            raise NektarException("Memo message must be a UTF-8 string.")
-        if not (len(message.encode("utf-8")) <= 256):
-            raise NektarException("Memo message must be not more than 2048 bytes.")
-        data["memo"] = message
-
-        ref_block_num, ref_block_prefix = self.get_reference_block_data()
-        expire = _within_range(expire, 5, 120, 30)
-        expiration = _make_expiration(expire)
-        synchronous = _true_or_false(synchronous, False)
-        strict = _true_or_false(strict, True)
-        verify_only = _true_or_false(verify_only, False)
-
-        operations = [[operation, data]]
-        transaction = {
-            "ref_block_num": ref_block_num,
-            "ref_block_prefix": ref_block_prefix,
-            "expiration": expiration,
-            "operations": operations,
-            "extensions": [],
-        }
-
-        return self._broadcast(transaction, synchronous, strict, verify_only)
-
-    def transfer_to_savings(
-        self,
-        receiver,
-        amount,
-        asset,
-        message,
-        expire=30,
-        synchronous=False,
-        strict=True,
-        verify_only=False,
-    ):
-        """For time locked savings accounts.
-
-        :param receiver: a valid Hive account username
-        :param amount: any positive value
-        :param asset: asset type to send, `HBD` or `HIVE` only
-        :param message: any UTF-8 string up to 2048 bytes only
-        :param expire: transaction expiration in seconds (Default value = 30)
-        :param synchronous: broadcasting method (Default value = False)
-        :param strict: flag to cause exception upon encountering an error (Default value = True)
-        :param verify_only: flag to verify required authority or to fully complete the broadcast operation (Default value = False)
-
-        """
-
-        return self.memo(
+    
+        self.transfer_to_vesting(
             receiver,
             amount,
-            asset,
-            message,
-            to_savings=True,
             expire=expire,
             synchronous=synchronous,
             strict=strict,
-            verify_only=verify_only,
+            debug=False,
         )
 
 
@@ -1322,7 +1372,7 @@ class Swarm(Nektar):
         expire=30,
         synchronous=False,
         strict=True,
-        verify_only=False,
+        debug=False,
     ):
         """Mute posts or comments with a designated note.
 
@@ -1331,9 +1381,9 @@ class Swarm(Nektar):
         :param notes: reason for muting
         :param mute: mute author (Default value = True)
         :param expire: transaction expiration in seconds (Default value = 30)
-        :param synchronous: broadcasting method (Default value = False)
+        :param synchronous: flah to broadcasting method synchronously (Default value = False)
         :param strict: flag to cause exception upon encountering an error (Default value = True)
-        :param verify_only: flag to verify required authority or to fully complete the broadcast operation (Default value = False)
+        :param debug: flag to disable completion of the broadcast operation (Default value = False)
 
         """
 
@@ -1347,41 +1397,25 @@ class Swarm(Nektar):
         if not isinstance(notes, str):
             raise NektarException("Notes must be in string format.")
 
-        action = "mutePost"
+        operation = ["mutePost", {}]
         if not isinstance(mute, bool):
             raise NektarException("`mute` must be either `True` or `False` only.")
         if not mute:
-            action = "unmutePost"
-
-        data = {}
-        data["required_auths"] = []
-        data["required_posting_auths"] = [self.username]
-        data["id"] = "community"
-
-        json_data = {}
-        json_data["community"] = self._community
-        json_data["account"] = author
-        json_data["permlink"] = permlink
-        json_data["notes"] = notes
-        operation = [action, json_data]
-        data["json"] = json.dumps(operation).replace("'", '\\"')
-
-        ref_block_num, ref_block_prefix = self.get_reference_block_data()
-        expire = _within_range(expire, 5, 120, 30)
-        expiration = _make_expiration(expire)
-        synchronous = _true_or_false(synchronous, False)
-        strict = _true_or_false(strict, True)
-        verify_only = _true_or_false(verify_only, False)
-
-        operations = [["custom_json", data]]
-        transaction = {
-            "ref_block_num": ref_block_num,
-            "ref_block_prefix": ref_block_prefix,
-            "expiration": expiration,
-            "operations": operations,
-            "extensions": [],
-        }
-        return self._broadcast(transaction, synchronous, strict, verify_only)
+            operation[0] = "unmutePost"
+        operation[1] = { "community":  self._community,
+                    "account": author,
+                    "permlink": permlink,
+                    "notes": notes }
+        
+        return self.custom_json(
+            id_="community",
+            json_data=operation,
+            required_auths=[],
+            required_posting_auths=[self.username],
+            expire=expire,
+            synchronous=synchronous,
+            strict=strict,
+            debug=debug)
 
     def unmute(
         self,
@@ -1391,7 +1425,7 @@ class Swarm(Nektar):
         expire=30,
         synchronous=False,
         strict=True,
-        verify_only=False,
+        debug=False,
     ):
         """Unmute posts or comments with a designated note.
 
@@ -1399,12 +1433,12 @@ class Swarm(Nektar):
         :param permlink: permlink to the blog post
         :param notes: reason for unmuting
         :param expire: transaction expiration in seconds (Default value = 30)
-        :param synchronous: broadcasting method (Default value = False)
+        :param synchronous: flah to broadcasting method synchronously (Default value = False)
         :param strict: flag to cause exception upon encountering an error (Default value = True)
-        :param verify_only: flag to verify required authority or to fully complete the broadcast operation (Default value = False)
+        :param debug: flag to disable completion of the broadcast operation (Default value = False)
 
         """
-        return self.mute(author, permlink, notes, False, expire, strict, verify_only)
+        return self.mute(author, permlink, notes, False, expire, strict, debug)
 
     def mark_spam(
         self,
@@ -1413,19 +1447,19 @@ class Swarm(Nektar):
         expire=30,
         synchronous=False,
         strict=True,
-        verify_only=False,
+        debug=False,
     ):
         """Muting post but noted as `spam` as standardized label for spams.
 
         :param author: a valid blockchain account username
         :param permlink: actual permlink to the specified author
         :param expire: transaction expiration in seconds (Default value = 30)
-        :param synchronous: broadcasting method (Default value = False)
+        :param synchronous: flah to broadcasting method synchronously (Default value = False)
         :param strict: flag to cause exception upon encountering an error (Default value = True)
-        :param verify_only: flag to verify required authority or to fully complete the broadcast operation (Default value = False)
+        :param debug: flag to disable completion of the broadcast operation (Default value = False)
 
         """
-        self.mute(author, permlink, "spam", True, expire, strict, verify_only)
+        self.mute(author, permlink, "spam", True, expire, strict, debug)
 
     def update(
         self,
@@ -1437,7 +1471,7 @@ class Swarm(Nektar):
         expire=30,
         synchronous=False,
         strict=True,
-        verify_only=False,
+        debug=False,
     ):
         """Update community properties.
 
@@ -1447,9 +1481,9 @@ class Swarm(Nektar):
         :param description: mute author (Default value = True)
         :param flag_text: mute author (Default value = True)
         :param expire: transaction expiration in seconds (Default value = 30)
-        :param synchronous: broadcasting method (Default value = False)
+        :param synchronous: flah to broadcasting method synchronously (Default value = False)
         :param strict: flag to cause exception upon encountering an error (Default value = True)
-        :param verify_only: flag to verify required authority or to fully complete the broadcast operation (Default value = False)
+        :param debug: flag to disable completion of the broadcast operation (Default value = False)
 
         """
 
@@ -1486,24 +1520,16 @@ class Swarm(Nektar):
         json_data["community"] = self._community
         json_data["props"] = props
         operation = ["updateProps", json_data]
-        data["json"] = json.dumps(operation).replace("'", '\\"')
-
-        ref_block_num, ref_block_prefix = self.get_reference_block_data()
-        expire = _within_range(expire, 5, 120, 30)
-        expiration = _make_expiration(expire)
-        synchronous = _true_or_false(synchronous, False)
-        strict = _true_or_false(strict, True)
-        verify_only = _true_or_false(verify_only, False)
-
-        operations = [["custom_json", data]]
-        transaction = {
-            "ref_block_num": ref_block_num,
-            "ref_block_prefix": ref_block_prefix,
-            "expiration": expiration,
-            "operations": operations,
-            "extensions": [],
-        }
-        return self._broadcast(transaction, synchronous, strict, verify_only)
+        
+        return self.custom_json(
+            id_="community",
+            json_data=operation,
+            required_auths=[],
+            required_posting_auths=[self.username],
+            expire=expire,
+            synchronous=synchronous,
+            strict=strict,
+            debug=debug)
 
     def subscribe(
         self,
@@ -1511,60 +1537,46 @@ class Swarm(Nektar):
         expire=30,
         synchronous=False,
         strict=True,
-        verify_only=False,
+        debug=False,
     ):
         """Subscribe to the community.
 
         :param mute: subscribe to the community (Default value = True)
         :param expire: transaction expiration in seconds (Default value = 30)
-        :param synchronous: broadcasting method (Default value = False)
+        :param synchronous: flah to broadcasting method synchronously (Default value = False)
         :param strict: flag to cause exception upon encountering an error (Default value = True)
-        :param verify_only: flag to verify required authority or to fully complete the broadcast operation (Default value = False)
+        :param debug: flag to disable completion of the broadcast operation (Default value = False)
 
         """
 
-        action = "subscribe"
+        operation = ["subscribe", {}]
         if not isinstance(subscribe, bool):
             raise NektarException("`subscribe` must be either `True` or `False` only.")
         if not subscribe:
-            action = "unsubscribe"
+            operation[0] = "unsubscribe"
+        operation[1] = {"community": self._community}
+        
+        return self.custom_json(
+            id_="community",
+            json_data=operation,
+            required_auths=[],
+            required_posting_auths=[self.username],
+            expire=expire,
+            synchronous=synchronous,
+            strict=strict,
+            debug=debug)
 
-        data = {}
-        data["required_auths"] = []
-        data["required_posting_auths"] = [self.username]
-        data["id"] = "community"
-
-        operation = [action, {"community": self._community}]
-        data["json"] = json.dumps(operation).replace("'", '\\"')
-
-        ref_block_num, ref_block_prefix = self.get_reference_block_data()
-        expire = _within_range(expire, 5, 120, 30)
-        expiration = _make_expiration(expire)
-        synchronous = _true_or_false(synchronous, False)
-        strict = _true_or_false(strict, True)
-        verify_only = _true_or_false(verify_only, False)
-
-        operations = [["custom_json", data]]
-        transaction = {
-            "ref_block_num": ref_block_num,
-            "ref_block_prefix": ref_block_prefix,
-            "expiration": expiration,
-            "operations": operations,
-            "extensions": [],
-        }
-        return self._broadcast(transaction, synchronous, strict, verify_only)
-
-    def unsubscribe(self, expire=30, synchronous=False, strict=True, verify_only=False):
+    def unsubscribe(self, expire=30, synchronous=False, strict=True, debug=False):
         """Unsubscribe to the community.
 
         :param expire: transaction expiration in seconds (Default value = 30)
-        :param synchronous: broadcasting method (Default value = False)
+        :param synchronous: flah to broadcasting method synchronously (Default value = False)
         :param strict: flag to cause exception upon encountering an error (Default value = True)
-        :param verify_only: flag to verify required authority or to fully complete the broadcast operation (Default value = False)
+        :param debug: flag to disable completion of the broadcast operation (Default value = False)
 
         """
 
-        return self.subscribe(False, expire, synchronous, strict, verify_only)
+        return self.subscribe(False, expire, synchronous, strict, debug)
 
     def pin(
         self,
@@ -1574,16 +1586,16 @@ class Swarm(Nektar):
         expire=30,
         synchronous=False,
         strict=True,
-        verify_only=False,
+        debug=False,
     ):
         """Pin post to the top of the community homepage.
 
         :param author: username of author of the blog post
         :param permlink: permlink to the blog post
         :param expire: transaction expiration in seconds (Default value = 30)
-        :param synchronous: broadcasting method (Default value = False)
+        :param synchronous: flah to broadcasting method synchronously (Default value = False)
         :param strict: flag to cause exception upon encountering an error (Default value = True)
-        :param verify_only: flag to verify required authority or to fully complete the broadcast operation (Default value = False)
+        :param debug: flag to disable completion of the broadcast operation (Default value = False)
 
         """
 
@@ -1601,33 +1613,20 @@ class Swarm(Nektar):
             action = "unpinPost"
 
         data = {}
-        data["required_auths"] = []
-        data["required_posting_auths"] = [self.username]
-        data["id"] = "community"
-
-        json_data = {}
-        json_data["community"] = self._community
-        json_data["account"] = author
-        json_data["permlink"] = permlink
-        operation = [action, json_data]
-        data["json"] = json.dumps(operation).replace("'", '\\"')
-
-        ref_block_num, ref_block_prefix = self.get_reference_block_data()
-        expire = _within_range(expire, 5, 120, 30)
-        expiration = _make_expiration(expire)
-        synchronous = _true_or_false(synchronous, False)
-        strict = _true_or_false(strict, True)
-        verify_only = _true_or_false(verify_only, False)
-
-        operations = [["custom_json", data]]
-        transaction = {
-            "ref_block_num": ref_block_num,
-            "ref_block_prefix": ref_block_prefix,
-            "expiration": expiration,
-            "operations": operations,
-            "extensions": [],
-        }
-        return self._broadcast(transaction, synchronous, strict, verify_only)
+        data["community"] = self._community
+        data["account"] = author
+        data["permlink"] = permlink
+        operation = [action, data]
+        
+        return self.custom_json(
+            id_="community",
+            json_data=operation,
+            required_auths=[],
+            required_posting_auths=[self.username],
+            expire=expire,
+            synchronous=synchronous,
+            strict=strict,
+            debug=debug)
 
     def unpin(
         self,
@@ -1636,20 +1635,20 @@ class Swarm(Nektar):
         expire=30,
         synchronous=False,
         strict=True,
-        verify_only=False,
+        debug=False,
     ):
         """Unpin post from the top of the community homepage.
 
         :param author: username of author of the blog post
         :param permlink: permlink to the blog post
         :param expire: transaction expiration in seconds (Default value = 30)
-        :param synchronous: broadcasting method (Default value = False)
+        :param synchronous: flah to broadcasting method synchronously (Default value = False)
         :param strict: flag to cause exception upon encountering an error (Default value = True)
-        :param verify_only: flag to verify required authority or to fully complete the broadcast operation (Default value = False)
+        :param debug: flag to disable completion of the broadcast operation (Default value = False)
 
         """
 
-        self.pin(author, permlink, False, expire, synchronous, strict, verify_only)
+        self.pin(author, permlink, False, expire, synchronous, strict, debug)
 
     def flag(
         self,
@@ -1659,7 +1658,7 @@ class Swarm(Nektar):
         expire=30,
         synchronous=False,
         strict=True,
-        verify_only=False,
+        debug=False,
     ):
         """It’s up to the community to define what constitutes flagging.
 
@@ -1667,9 +1666,9 @@ class Swarm(Nektar):
         :param permlink: permlink to the blog post
         :param notes: reason for muting
         :param expire: transaction expiration in seconds (Default value = 30)
-        :param synchronous: broadcasting method (Default value = False)
+        :param synchronous: flah to broadcasting method synchronously (Default value = False)
         :param strict: flag to cause exception upon encountering an error (Default value = True)
-        :param verify_only: flag to verify required authority or to fully complete the broadcast operation (Default value = False)
+        :param debug: flag to disable completion of the broadcast operation (Default value = False)
 
         """
 
@@ -1684,34 +1683,21 @@ class Swarm(Nektar):
             raise NektarException("Notes must be in string format.")
 
         data = {}
-        data["required_auths"] = []
-        data["required_posting_auths"] = [self.username]
-        data["id"] = "community"
-
-        json_data = {}
-        json_data["community"] = self._community
-        json_data["account"] = author
-        json_data["permlink"] = permlink
-        json_data["notes"] = notes
-        operation = ["flagPost", json_data]
-        data["json"] = json.dumps(operation).replace("'", '\\"')
-
-        ref_block_num, ref_block_prefix = self.get_reference_block_data()
-        expire = _within_range(expire, 5, 120, 30)
-        expiration = _make_expiration(expire)
-        synchronous = _true_or_false(synchronous, False)
-        strict = _true_or_false(strict, True)
-        verify_only = _true_or_false(verify_only, False)
-
-        operations = [["custom_json", data]]
-        transaction = {
-            "ref_block_num": ref_block_num,
-            "ref_block_prefix": ref_block_prefix,
-            "expiration": expiration,
-            "operations": operations,
-            "extensions": [],
-        }
-        return self._broadcast(transaction, synchronous, strict, verify_only)
+        data["community"] = self._community
+        data["account"] = author
+        data["permlink"] = permlink
+        data["notes"] = notes
+        operation = ["flagPost", data]
+        
+        return self.custom_json(
+            id_="community",
+            json_data=operation,
+            required_auths=[],
+            required_posting_auths=[self.username],
+            expire=expire,
+            synchronous=synchronous,
+            strict=strict,
+            debug=debug)
 
 
 ##############################

@@ -23,14 +23,97 @@ This is compatible with Python 3.9 or later.
 **3.** Highly costumizable via `appbase` module. <br>
 
 ## Nektar Module
-Contains the Waggle, Swarm, and Drone classes.
+Contains the Waggle, Swarm, and Drone classes. 
+
+***WARNING:*** Store WIFs securely in a separate file!
+
+**Import Module**
+```python
+from nektar import Waggle
+import json
+
+wifs = { "active": "5*" , "posting": "5*"}
+hive = Nektar(username, wifs=wifs)
+
+# Hive Developer Portal > Understanding Configuration Values
+# https://developers.hive.io/tutorials-recipes/understanding-configuration-values.html
+data = hive.get_config()
+print(json.dumps(data, indent=2))
+
+# get configuration values
+data = hive.get_config(field="HIVE_CHAIN_ID", fallback="bee*")
+print("HIVE_CHAIN_ID: " + str(data))
+
+# get user's resource credits
+prin(hive.resource_credits())
+print(hive.resource_credits("valid-username"))
+
+# get user's manabar
+percentage = hive.manabar()
+print("Current Mana: " + str(int(percentage)) + "%")
+
+# transfer HBD to another account
+receiver = "valid-username"
+amount = 0.001
+asset = "HBD"
+message = "Thanks for supporting us!"
+hive.memo(receiver, amount, asset, message)
+
+# transfer HIVE to another account
+receiver = "valid-username"
+amount = 0.001
+asset = "HIVE"
+message = "Thanks for supporting us!"
+result = hive.memo(receiver, amount, asset, message)
+
+# transfer HBD to savings
+receiver = "valid-username"
+amount = 0.001
+asset = "HBD"
+message = "Thanks for supporting us!"
+hive.transfer_to_savings(receiver, amount, asset, message)
+
+# transfer HIVE to savings
+receiver = "valid-username"
+amount = 0.001
+asset = "HIVE"
+message = "Thanks for supporting us!"
+hive.transfer_to_savings(receiver, amount, asset, message)
+
+# transfer HIVE to vesting (power up)
+receiver = "valid-username"
+amount = 0.001
+hive.transfer_to_vesting(receiver, amount)
+
+# Broadcasting a custom JSON (Posting key)
+hive.custom_json(
+    id_="nektar-tests",
+    jdata={ "test": "nektar" },
+    required_posting_auths=["valid-username"]
+
+# Broadcasting a custom JSON (Active key)
+hive.custom_json(
+    id_="nektar-tests",
+    jdata={ "test": "nektar" },
+    required_auths=["valid-username"]
+
+```
+
+**Import Module**
+```python
+from nektar import Waggle
+import json
+
+wifs = { "active": "5*" , "posting": "5*"}
+hive = Nektar(username, wifs=wifs)
+```
 
 ## Waggle Class 
 Methods for blogging and engagement
 **Import Module**
 ```python
 from nektar import Waggle
-import json # leverage json to `beautify` purpose only
+import json
 ```
 
 **Basic Setup**
@@ -449,6 +532,11 @@ signed_transaction = [ { "ref_block_num": 0, "ref_block_prefix": 0, "expiration"
 
 verified = hive.verify_authority(signed_transaction)
 print("OK:", verified)
+```
+
+**Power Up** 
+```python
+hive.power_up("valid-username", 100)
 ```
 
 ## Swarm Class 

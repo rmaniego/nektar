@@ -18,7 +18,7 @@ from binascii import hexlify, unhexlify
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 
-from .transactions import sign_transaction, as_bytes
+from .transactions import sign_transaction
 from .constants import NEKTAR_VERSION, NODES, APPBASE_API, BLOCKCHAIN_OPERATIONS, ROLES
 from .exceptions import NektarException
 
@@ -76,8 +76,6 @@ class AppBase:
 
         self.wifs = {}
         self.chain_id = chain_id
-        if not isinstance(self.chain_id, str):
-            self.chain_id = self.api("database").get_version({})["chain_id"]
         self._transaction_id = None
         self.signed_transaction = None
 
@@ -93,9 +91,8 @@ class AppBase:
             nodes = [nodes]
         self.node = []
         for node in list(nodes):
-            patterns = [r"http[s]{0,1}\:[\/]{2}", r"[\/][\w\W]+"]
-            for pattern in patterns:
-                node = re.sub(pattern, "", node)
+            node = re.sub(r"http[s]{0,1}\:[\/]{2}", "", node)
+            node = re.sub(r"[\/][\w\W]+", "", node)
             if not len(node):
                 raise NektarException("Invalid node format.")
             self.nodes.append(node)
@@ -288,15 +285,18 @@ class AppBase:
         payload = _format_payload(method, params, self.rid)
         return self._send_request(payload, strict=strict)
 
-    def broadcast(self, method, transaction, strict=True, verify_only=False):
+    def broadcast(self, method, transaction, strict=True, debug=False):
         """Broadcast a transaction to the blockchain.
 
         :param method:
         :param transaction:
         :param strict:  (Default value = True)
-        :param verify_only:  (Default value = False)
+        :param debug:  (Default value = False)
 
         """
+        
+        if not isinstance(self.chain_id, str):
+            self.chain_id = self.api("database").get_version({})["chain_id"]
 
         ## check if operations are valid
         operation = ""
@@ -309,38 +309,33 @@ class AppBase:
                 if not len(op[1]["required_auths"]):
                     operation = "posting"
 
-        signatures = []
-        if "signatures" in transaction:
-            signatures = transaction["signatures"]
-            transaction.pop("transaction", None)
+        # signatures = []
+        # if "signatures" in transaction:
+        #     signatures = transaction["signatures"]
+        #     transaction.pop("transaction", None)
 
         ## serialize transaction and sign with private keys
         serialized_transaction = self._serialize(transaction)
 
         ## generate transaction id
         hashed = hashlib.sha256(unhexlify(serialized_transaction)).digest()
-        self._transaction_id = hexlify(hashed[:20]).decode("ascii")
+        # self._transaction_id = hexlify(hashed[:20]).decode("ascii")
 
         ## update transaction signature
-        wifs = _get_necessary_wifs(self.wifs, operation)
-        signatures.extend(sign_transaction(self.chain_id, serialized_transaction, wifs))
-        transaction["signatures"] = list(set(signatures))
         self.signed_transaction = transaction
-
-        verified = self.api("condenser").verify_authority(transaction)
-        if strict and not verified:
-            raise NektarException("Transaction does not contain required signatures.")
-        if verify_only:
-            return verified
+        wifs = _get_necessary_wifs(self.wifs, operation)
+        self.signed_transaction["signatures"] = sign_transaction(self.chain_id, serialized_transaction, wifs)
+        
+        if strict:
+            verified = self.api("condenser").verify_authority(self.signed_transaction)
+            if not (not debug and verified):
+                raise NektarException("Transaction does not contain required signatures.")
+            if debug:
+               return verified
 
         self.rid += 1
-        params = [transaction]
-        payload = _format_payload(method, params, self.rid)
-        result = self._send_request(payload, strict)
-        if method == "condenser_api.broadcast_transaction" and not strict:
-            ## not working
-            return self.api("condenser_api").get_transaction([self._transaction_id])
-        return result
+        payload = _format_payload(method, [self.signed_transaction], self.rid)
+        return self._send_request(payload, strict)
 
     def _serialize(self, transaction):
         """Get a hexdump of the serialized binary form of a transaction.
@@ -357,7 +352,7 @@ class AppBase:
         :param strict: flag to cause exception upon encountering an error (Default value = True)
 
         """
-        response = None
+        data = {}
         for node in self.nodes:
             try:
                 url = "https://" + node
@@ -365,20 +360,15 @@ class AppBase:
                     url, headers=self.headers, json=payload, timeout=self.timeout
                 )
                 response.raise_for_status()
-                response = json.loads(response.content.decode("utf-8"))
+                data = json.loads(response.content.decode("utf-8"))
                 break
             except:
                 warnings.warn(
                     f"Node '{node}' is unavailable, retrying with the next node."
                 )
-        if response is None:
-            return {}
-        if "result" in response:
-            return response["result"]
-        if "error" in response:
-            if strict:
-                raise NektarException(response["error"].get("message"))
-        return {}
+        if strict and ("error" in data):
+            raise NektarException(data["error"].get("message"))
+        return data.get("result", {})
 
 
 #########################

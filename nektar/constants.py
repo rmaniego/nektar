@@ -13,7 +13,7 @@
     :license: MIT License
 """
 
-NEKTAR_VERSION = "0.9.31"
+NEKTAR_VERSION = "0.10.0"
 
 # PublicKey prefix
 PREFIX = "STM"
@@ -315,10 +315,11 @@ BLOCKCHAIN_OPERATIONS = [
 # HIVE PRIVATE KEY ROLES
 ROLES = {
     "all": ["owner", "active", "posting", "memo"],
-    "comment": ["owner", "active", "posting"],
-    "vote": ["owner", "active", "posting"],
-    "transfer_to_savings": ["owner", "active"],
-    "transfer": ["owner", "active"],
+    "comment": ["posting", "active", "owner"],
+    "vote": ["posting", "active", "owner"],
+    "transfer_to_vesting": ["active", "owner"],
+    "transfer_to_savings": ["active", "owner"],
+    "transfer": ["active", "owner"],
     "custom_json": ["active"],
     "owner": ["owner"],
     "active": ["active"],
