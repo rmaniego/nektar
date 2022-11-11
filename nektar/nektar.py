@@ -810,10 +810,10 @@ class Waggle(Nektar):
             return active_delegations
         return results
 
-    def posts(self, community=None, sort="created", paidout=None, limit=100):
+    def posts(self, tag=None, sort="created", paidout=None, limit=100):
         """Get ranked posts based on tag.
 
-        :param community: community name `hive-*` (Default value = None)
+        :param tag: any valid tags (Default value = None)
         :param sort: sort by `created`, `trending`, `hot`, `promoted`, `payout`, `payout_comments`, or `muted` (Default value = "created")
         :param paidout: return new (False), paidout (True), all (None) (Default value = None)
         :param limit: maximum limit of blogs (Default value = 100)
@@ -822,10 +822,8 @@ class Waggle(Nektar):
 
         params = {}
         params["tag"] = ""
-        if isinstance(community, str):
-            match = re.findall(r"\bhive-[\d]{1,6}\b", community)
-            if len(match):
-                params["tag"] = community
+        if isinstance(tag, str):
+            params["tag"] = tag
         params["sort"] = "created"
         if sort in (
             "trending",
@@ -1048,6 +1046,7 @@ class Waggle(Nektar):
         author,
         permlink,
         body,
+        edit=True,
         expire=30,
         synchronous=False,
         strict=True,
@@ -1058,6 +1057,7 @@ class Waggle(Nektar):
         :param author: username of author of the blog post being replied to
         :param permlink: permlink to the blog post being replied to
         :param body: the content of the comment
+        :param edit: edit existing comment on post (Default value = True)
         :param expire: transaction expiration in seconds (Default value = 30)
         :param synchronous: flah to broadcasting method synchronously (Default value = False)
         :param strict: flag to cause exception upon encountering an error (Default value = True)
@@ -1084,7 +1084,11 @@ class Waggle(Nektar):
             raise NektarException("Body must be at least 1 byte.")
         data["body"] = body
 
-        data["permlink"] = ("re-" + permlink)[:255]
+        uid = ""
+        edit = _true_or_false(edit, True)
+        if not edit:
+            uid = Sometime().custom("-%Y%m%d%H%M%S")
+        data["permlink"] = ("re-" + permlink + uid)[:255]
 
         ## create comment metadata
         json_metadata = {}

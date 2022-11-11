@@ -196,6 +196,24 @@ for sort in sorting:
         communities.update({community["name"]: community})
 ```
 
+**Get Posts with tag** 
+Get posts in a community by sorting filter:
+ - `created`
+ - `trending`
+ - `hot`
+ - `promoted`
+ - `payout`
+ - `payout_comments`
+ - `muted`
+
+```python
+tag = "travel"
+posts = hive.posts(tag, limit=100, sort="created")
+print(posts[0]["author"])
+print(posts[0]["permlink"])
+print(posts[0]["title"])
+```
+
 **Get Posts in a Community** 
 Get posts in a community by sorting filter:
  - `created`
