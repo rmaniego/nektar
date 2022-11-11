@@ -1087,7 +1087,7 @@ class Waggle(Nektar):
         uid = ""
         edit = _true_or_false(edit, True)
         if not edit:
-            uid = Sometime().custom("-%Y%m%d%H%M%S")
+            uid = _make_expiration(formatting="-%Y%m%d%H%M%S")
         data["permlink"] = ("re-" + permlink + uid)[:255]
 
         ## create comment metadata
@@ -1719,14 +1719,18 @@ def _check_wifs(roles, operation):
     return len([role for role in ROLES[operation] if role in roles])
 
 
-def _make_expiration(secs=30):
+def _make_expiration(secs=30, formatting=None):
     """Return a UTC datetime formatted for the blockchain.
 
     :param secs: (Default value = 30)
 
     """
     timestamp = time.time() + int(secs)
-    return datetime.utcfromtimestamp(timestamp).strftime(DATETIME_FORMAT)
+    if formatting is None:
+        formatting = DATETIME_FORMAT
+    if not isinstance(formatting, str):
+        raise NektarException("Formatting must be in string format.")
+    return datetime.utcfromtimestamp(timestamp).strftime(formatting)
 
 
 def _within_range(value, minimum, maximum, fallback=None):

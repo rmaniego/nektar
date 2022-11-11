@@ -13,7 +13,7 @@
     :license: MIT License
 """
 
-NEKTAR_VERSION = "0.10.1"
+NEKTAR_VERSION = "0.10.2"
 
 # PublicKey prefix
 PREFIX = "STM"
