@@ -715,7 +715,7 @@ class Waggle(Nektar):
 
         :param account: any valid Hive account username, default = initialized username (Default value = None)
         :param active: include all changes in delegations if false (Default value = False)
-        :param start: initial starting transaction (Default value = -1)
+        :param start: initial starting transaction (Default value = 1000)
         :param inward: inward delegations to the specified account (Default value = True)
 
         """
@@ -726,8 +726,8 @@ class Waggle(Nektar):
         if isinstance(account, str):
             params[0] = account
         
-        if start < 1000 or (start%1000 > 0):
-            raise NektarException("Start must be a value by the factor of 1000.")
+        if int(start) < 1000 or (start%1000 > 0):
+            raise NektarException("`start` must be a value by the factor of 1000.")
 
         operation_id = 40  # delegate_vesting_shares_operation
         params[3] = int("1".ljust(operation_id + 1, "0"), 2)
@@ -749,7 +749,8 @@ class Waggle(Nektar):
                 continue
             tids = [1000]
             for item in result:
-                tids.append(item[0])
+                if top == 0:
+                    tids.append(item[0])
                 delegation = item[1]["op"][1]
                 name = delegation[key]
                 if name == self.username:
