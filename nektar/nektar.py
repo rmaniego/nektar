@@ -710,105 +710,92 @@ class Waggle(Nektar):
 
         return self.appbase.condenser().get_account_history(params)
 
-    def delegators(self, account=None, active=False):
+    def delegations(self, account=None, active=False, start=-1, inward=True):
+        """Get all account delegators/delegatees and other related information.
+
+        :param account: any valid Hive account username, default = initialized username (Default value = None)
+        :param active: include all changes in delegations if false (Default value = False)
+        :param start: initial starting transaction (Default value = -1)
+        :param inward: inward delegations to the specified account (Default value = True)
+
+        """
+
+        params = ["", start, 1000, 0]
+
+        params[0] = self.username
+        if isinstance(account, str):
+            params[0] = account
+        
+        if start < 1000 or (start%1000 > 0):
+            if start != -1:
+                raise NektarException("Start must be -1 or values by factors of 1000.")
+
+        operation_id = 40  # delegate_vesting_shares_operation
+        params[3] = int("1".ljust(operation_id + 1, "0"), 2)
+        
+        if not isinstance(inward, bool):
+            raise NektarException("Inward must be `True` or `False` only.")
+        
+        key = "delegator"
+        if not inward:
+            key = "delegatee"
+
+        top = 0
+        results = {}
+        while True:
+            try:
+                result = self.appbase.condenser().get_account_history(params)
+            except:
+                params[1] += 1000
+                continue
+            tids = [1000]
+            for item in result:
+                tids.append(item[0])
+                delegation = item[1]["op"][1]
+                name = delegation[key]
+                if name == self.username:
+                    continue
+                if name not in results:
+                    results[name] = {}
+                results[name][item[1]["timestamp"]] = float(
+                    delegation["vesting_shares"].split(" ")[0]
+                )
+            if top == 0:
+                params[1] = 0
+                top = ((max(tids) // 1000) * 1000)
+            params[1] += 1000
+            if params[1] > top:
+                break
+        if active:
+            active_delegations = {}
+            for d, data in results.items():
+                recent = max(list(data.keys()))
+                if data[recent]:
+                    active_delegations[d] = data[recent]
+            return active_delegations
+        return results
+
+    def delegators(self, account=None, active=False, start=-1):
         """Get all account delegators and other related information.
 
         :param account: any valid Hive account username, default = initialized username (Default value = None)
         :param active: include all changes in delegations if false (Default value = False)
+        :param start: initial starting transaction (Default value = -1)
 
         """
+        
+        return self.delegations(account=account, active=active, start=start)
 
-        params = ["", -1, 1000, 0]
-
-        params[0] = self.username
-        if isinstance(account, str):
-            params[0] = account
-
-        operation_id = 40  # delegate_vesting_shares_operation
-        params[3] = int("1".ljust(operation_id + 1, "0"), 2)
-
-        results = {}
-        while True:
-            try:
-                result = self.appbase.condenser().get_account_history(params)
-            except:
-                params[1] -= 1000
-                continue
-            for item in result:
-                if params[1] == -1:
-                    params[1] = (item[0] // 1000) * 1000
-                if item[0] < params[1]:
-                    params[1] = ((item[0] // 1000) * 1000) - 1000
-                delegator = item[1]["op"][1]["delegator"]
-                if delegator == self.username:
-                    continue
-                if delegator not in results:
-                    results[delegator] = {}
-                timestamp = item[1]["timestamp"]
-                results[delegator][timestamp] = float(
-                    item[1]["op"][1]["vesting_shares"].split(" ")[0]
-                )
-            if params[1] < 1000:
-                break
-        if active:
-            active_delegations = {}
-            for d, data in results.items():
-                recent = max(list(data.keys()))
-                vesting = data[recent]
-                if vesting:
-                    active_delegations[d] = vesting
-            return active_delegations
-        return results
-
-    def delegatees(self, account=None, active=False):
+    def delegatees(self, account=None, active=False, start=-1):
         """Get all account delegatees and other related information.
 
         :param account: any valid Hive account username, default = initialized username (Default value = None)
         :param active: include all changes in delegations if false (Default value = False)
+        :param start: initial starting transaction (Default value = -1)
 
         """
-
-        params = ["", -1, 1000, 0]
-
-        params[0] = self.username
-        if isinstance(account, str):
-            params[0] = account
-
-        operation_id = 40  # delegate_vesting_shares_operation
-        params[3] = int("1".ljust(operation_id + 1, "0"), 2)
-
-        results = {}
-        while True:
-            try:
-                result = self.appbase.condenser().get_account_history(params)
-            except:
-                params[1] -= 1000
-                continue
-            for item in result:
-                if params[1] == -1:
-                    params[1] = (item[0] // 1000) * 1000
-                if item[0] < params[1]:
-                    params[1] = ((item[0] // 1000) * 1000) - 1000
-                delegatee = item[1]["op"][1]["delegatee"]
-                if delegatee == self.username:
-                    continue
-                if delegatee not in results:
-                    results[delegatee] = {}
-                timestamp = item[1]["timestamp"]
-                results[delegatee][timestamp] = float(
-                    item[1]["op"][1]["vesting_shares"].split(" ")[0]
-                )
-            if params[1] < 1000:
-                break
-        if active:
-            active_delegations = {}
-            for d, data in results.items():
-                recent = max(list(data.keys()))
-                vesting = data[recent]
-                if vesting:
-                    active_delegations[d] = vesting
-            return active_delegations
-        return results
+        
+        return self.delegations(account=account, active=active, start=start, inward=False)
 
     def posts(self, tag=None, sort="created", paidout=None, limit=100):
         """Get ranked posts based on tag.
