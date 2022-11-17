@@ -13,7 +13,7 @@ Current version is 0.9.\*, but more updates are coming soon.
 This is compatible with Python 3.9 or later.
 
 ## WARNINGS:
- - This package is still under development, some future breakage is inevatable.
+ - This package is still under development, some future breakage is inevitable.
  - Some AppBase API methods are still under development and subject to change.
  - Do NOT copy your private keys in your codes!
 

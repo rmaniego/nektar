@@ -710,7 +710,7 @@ class Waggle(Nektar):
 
         return self.appbase.condenser().get_account_history(params)
 
-    def delegations(self, account=None, active=False, start=-1, inward=True):
+    def delegations(self, account=None, active=False, start=1000, inward=True):
         """Get all account delegators/delegatees and other related information.
 
         :param account: any valid Hive account username, default = initialized username (Default value = None)
@@ -720,15 +720,14 @@ class Waggle(Nektar):
 
         """
 
-        params = ["", start, 1000, 0]
+        params = ["", -1, 1000, 0]
 
         params[0] = self.username
         if isinstance(account, str):
             params[0] = account
         
         if start < 1000 or (start%1000 > 0):
-            if start != -1:
-                raise NektarException("Start must be -1 or values by factors of 1000.")
+            raise NektarException("Start must be a value by the factor of 1000.")
 
         operation_id = 40  # delegate_vesting_shares_operation
         params[3] = int("1".ljust(operation_id + 1, "0"), 2)
@@ -761,7 +760,7 @@ class Waggle(Nektar):
                     delegation["vesting_shares"].split(" ")[0]
                 )
             if top == 0:
-                params[1] = 0
+                params[1] = start
                 top = ((max(tids) // 1000) * 1000)
             params[1] += 1000
             if params[1] > top:
