@@ -1058,9 +1058,9 @@ class Waggle(Nektar):
                 "The `reblog` operation requires"
                 "one of the following private keys:" + ", ".join(ROLES["reblog"])
             )
-        jdata = {"account": self.username, "author": author, "permlink": permlink}
+        jdata = ["reblog", {"account": self.username, "author": author, "permlink": permlink}]
         return self.custom_json(
-            "reblog",
+            "follow",
             jdata,
             required_posting_auths=[self.username],
             expire=expire,

@@ -316,7 +316,7 @@ BLOCKCHAIN_OPERATIONS = [
 ROLES = {
     "all": ["owner", "active", "posting", "memo"],
     "comment": ["posting", "active", "owner"],
-    "reblog": ["posting", "active", "owner"],
+    "follow": ["posting", "active", "owner"],
     "vote": ["posting", "active", "owner"],
     "transfer_to_vesting": ["active", "owner"],
     "transfer_to_savings": ["active", "owner"],
