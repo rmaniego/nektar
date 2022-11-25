@@ -1059,7 +1059,7 @@ class Waggle(Nektar):
                 "one of the following private keys:" + ", ".join(ROLES["reblog"])
             )
         jdata = {"account": self.username, "author": author, "permlink": permlink}
-        return hive.custom_json(
+        return self.custom_json(
             "reblog",
             jdata,
             required_posting_auths=[self.username],
