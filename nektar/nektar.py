@@ -202,9 +202,7 @@ class Nektar:
         """
         return self.appbase.condenser().verify_authority(transaction, strict=False)
 
-    def _broadcast(
-        self, transaction, synchronous=False, strict=True, debug=False
-    ):
+    def _broadcast(self, transaction, synchronous=False, strict=True, debug=False):
         """Processes the transaction for broadcasting into the blockchain.
 
         :param transaction: the formatted transaction based on the API method
@@ -320,7 +318,7 @@ class Nektar:
         :param debug: flag to disable completion of the broadcast operation (Default value = False)
 
         """
-        
+
         asset = asset.upper()
         if asset not in ("HBD", "HIVE"):
             raise NektarException("Memo only accepts transfer of HBD and HIVE assets.")
@@ -328,9 +326,13 @@ class Nektar:
         operations = [["transfer", {}]]
         if to is not None:
             if to not in ("savings", "vesting"):
-                raise NektarException("Value of `to` must be `None`, `savings`, or `vesting` only.")
+                raise NektarException(
+                    "Value of `to` must be `None`, `savings`, or `vesting` only."
+                )
             if to == "vesting" and asset != "HIVE":
-                raise NektarException("Transfer to vesting only accepts transfer of HIVE asset only.")
+                raise NektarException(
+                    "Transfer to vesting only accepts transfer of HIVE asset only."
+                )
             operations[0][0] = "transfer_to_" + to
 
         data = {}
@@ -432,7 +434,7 @@ class Nektar:
         :param debug: flag to disable completion of the broadcast operation (Default value = False)
 
         """
-        
+
         asset = "HIVE"
         return self.memo(
             receiver,
@@ -442,7 +444,8 @@ class Nektar:
             expire=expire,
             synchronous=synchronous,
             strict=strict,
-            debug=debug)
+            debug=debug,
+        )
 
 
 class Waggle(Nektar):
@@ -725,16 +728,16 @@ class Waggle(Nektar):
         params[0] = self.username
         if isinstance(account, str):
             params[0] = account
-        
-        if int(start) < 1000 or (start%1000 > 0):
+
+        if int(start) < 1000 or (start % 1000 > 0):
             raise NektarException("`start` must be a value by the factor of 1000.")
 
         operation_id = 40  # delegate_vesting_shares_operation
         params[3] = int("1".ljust(operation_id + 1, "0"), 2)
-        
+
         if not isinstance(inward, bool):
             raise NektarException("Inward must be `True` or `False` only.")
-        
+
         key = "delegator"
         if not inward:
             key = "delegatee"
@@ -762,7 +765,7 @@ class Waggle(Nektar):
                 )
             if top == 0:
                 params[1] = start
-                top = ((max(tids) // 1000) * 1000)
+                top = (max(tids) // 1000) * 1000
             params[1] += 1000
             if params[1] > top:
                 break
@@ -783,7 +786,7 @@ class Waggle(Nektar):
         :param start: initial starting transaction (Default value = -1)
 
         """
-        
+
         return self.delegations(account=account, active=active, start=start)
 
     def delegatees(self, account=None, active=False, start=-1):
@@ -794,8 +797,10 @@ class Waggle(Nektar):
         :param start: initial starting transaction (Default value = -1)
 
         """
-        
-        return self.delegations(account=account, active=active, start=start, inward=False)
+
+        return self.delegations(
+            account=account, active=active, start=start, inward=False
+        )
 
     def posts(self, tag=None, sort="created", paidout=None, limit=100):
         """Get ranked posts based on tag.
@@ -1028,6 +1033,42 @@ class Waggle(Nektar):
         }
         return self._broadcast(transaction, synchronous, strict, debug)
 
+    def reblog(
+        self,
+        author,
+        permlink,
+        expire=30,
+        synchronous=False,
+        strict=True,
+        debug=False,
+    ):
+        """Reblog post.
+
+        :param author: username of author of the blog post  to reblog
+        :param permlink: permlink to the blog post to reblog
+        :param expire: transaction expiration in seconds (Default value = 30)
+        :param synchronous: flah to broadcasting method synchronously (Default value = False)
+        :param strict: flag to cause exception upon encountering an error (Default value = True)
+        :param debug: flag to disable completion of the broadcast operation (Default value = False)
+
+        """
+
+        if not _check_wifs(self.roles, "reblog"):
+            raise NektarException(
+                "The `reblog` operation requires"
+                "one of the following private keys:" + ", ".join(ROLES["reblog"])
+            )
+        jdata = {"account": self.username, "author": author, "permlink": permlink}
+        return hive.custom_json(
+            "reblog",
+            jdata,
+            required_posting_auths=[self.username],
+            expire=expire,
+            synchronous=synchronous,
+            strict=strict,
+            debug=debug,
+        )
+
     def reply(
         self,
         author,
@@ -1174,6 +1215,7 @@ class Waggle(Nektar):
         permlink,
         weight=10000,
         percent=None,
+        check=False,
         expire=30,
         synchronous=False,
         strict=True,
@@ -1185,6 +1227,7 @@ class Waggle(Nektar):
         :param permlink: permlink of the post or comment being voted
         :param weight: vote weight between -10000 to 10000 (Default value = 10000)
         :param percent: override vote weight with percentage (Default value = None)
+        :param check: check if account had already voted on the post (Default value = False)
         :param expire: transaction expiration in seconds (Default value = 30)
         :param synchronous: flah to broadcasting method synchronously (Default value = False)
         :param strict: flag to cause exception upon encountering an error (Default value = True)
@@ -1210,6 +1253,10 @@ class Waggle(Nektar):
         match = re.findall(pattern, permlink)
         if not len(match):
             raise NektarException("permlink must be a valid url-escaped string.")
+
+        if _true_or_false(check, False):
+            if self.voted(author, permlink):
+                return {}
 
         if isinstance(percent, (int, float)):
             percent = _within_range(percent, -100, 100)
@@ -1273,7 +1320,15 @@ class Waggle(Nektar):
             if len(data):
                 return data
         return {}
-    
+
+    def voted(
+        self, author, permlink, expire=30, synchronous=False, strict=True, debug=False
+    ):
+
+        votes = self.votes(author, permlink)
+        votes = len([1 for v in votes if (v.get("voter") == self.username)])
+        return bool(votes)
+
     def power_up(
         self,
         receiver,
@@ -1283,7 +1338,7 @@ class Waggle(Nektar):
         strict=True,
         debug=False,
     ):
-    
+
         self.transfer_to_vesting(
             receiver,
             amount,
@@ -1393,11 +1448,13 @@ class Swarm(Nektar):
             raise NektarException("`mute` must be either `True` or `False` only.")
         if not mute:
             operation[0] = "unmutePost"
-        operation[1] = { "community":  self._community,
-                    "account": author,
-                    "permlink": permlink,
-                    "notes": notes }
-        
+        operation[1] = {
+            "community": self._community,
+            "account": author,
+            "permlink": permlink,
+            "notes": notes,
+        }
+
         return self.custom_json(
             id_="community",
             json_data=operation,
@@ -1406,7 +1463,8 @@ class Swarm(Nektar):
             expire=expire,
             synchronous=synchronous,
             strict=strict,
-            debug=debug)
+            debug=debug,
+        )
 
     def unmute(
         self,
@@ -1511,7 +1569,7 @@ class Swarm(Nektar):
         json_data["community"] = self._community
         json_data["props"] = props
         operation = ["updateProps", json_data]
-        
+
         return self.custom_json(
             id_="community",
             json_data=operation,
@@ -1520,7 +1578,8 @@ class Swarm(Nektar):
             expire=expire,
             synchronous=synchronous,
             strict=strict,
-            debug=debug)
+            debug=debug,
+        )
 
     def subscribe(
         self,
@@ -1546,7 +1605,7 @@ class Swarm(Nektar):
         if not subscribe:
             operation[0] = "unsubscribe"
         operation[1] = {"community": self._community}
-        
+
         return self.custom_json(
             id_="community",
             json_data=operation,
@@ -1555,7 +1614,8 @@ class Swarm(Nektar):
             expire=expire,
             synchronous=synchronous,
             strict=strict,
-            debug=debug)
+            debug=debug,
+        )
 
     def unsubscribe(self, expire=30, synchronous=False, strict=True, debug=False):
         """Unsubscribe to the community.
@@ -1608,7 +1668,7 @@ class Swarm(Nektar):
         data["account"] = author
         data["permlink"] = permlink
         operation = [action, data]
-        
+
         return self.custom_json(
             id_="community",
             json_data=operation,
@@ -1617,7 +1677,8 @@ class Swarm(Nektar):
             expire=expire,
             synchronous=synchronous,
             strict=strict,
-            debug=debug)
+            debug=debug,
+        )
 
     def unpin(
         self,
@@ -1679,7 +1740,7 @@ class Swarm(Nektar):
         data["permlink"] = permlink
         data["notes"] = notes
         operation = ["flagPost", data]
-        
+
         return self.custom_json(
             id_="community",
             json_data=operation,
@@ -1688,7 +1749,8 @@ class Swarm(Nektar):
             expire=expire,
             synchronous=synchronous,
             strict=strict,
-            debug=debug)
+            debug=debug,
+        )
 
 
 ##############################
