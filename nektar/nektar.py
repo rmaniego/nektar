@@ -90,6 +90,280 @@ class Nektar:
     ##################################################
     # raw condenser api methods                      #
     ##################################################
+    def get_account_count(self):
+        """Returns the number of accounts.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_account_count
+
+        Returns
+        -------
+        int:
+            The total number of blockchain accounts to date.
+        """
+        
+        return self.appbase.condenser().get_account_count([])
+
+    def get_account_history(self, account, start, limit, low=None, high=None):
+        """Returns a history of all operations for a given account.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_account_history https://gitlab.syncad.com/hive/hive/-/blob/master/libraries/protocol/include/hive/protocol/operations.hpp
+
+        Parameters
+        ----------
+        account : str
+            any valid Hive account username
+        start : int
+            starting range, or -1 for reverse history
+        limit : int
+            upperbound limit 1-1000
+        low : int, optional
+            operation id (default is None)
+        high : int, optional
+            operation id (default is None)
+
+        Returns
+        -------
+        list:
+            List of all transactions from start-limit to limit.
+        """
+
+        params = [self.username]
+        if isinstance(account, str):
+            params[0] = account
+
+        if int(start) < -1:
+            raise NektarException(
+                "`start` should be `-1` (latest history) or higher."
+            )
+        params.append(start)
+        limit = _within_range(limit, 1, 1000)
+        params.append(limit)
+
+        operations = list(range(len(BLOCKCHAIN_OPERATIONS)))
+        if isinstance(low, int):
+            ## for the first 64 blockchain operation
+            if int(low) not in operations:
+                raise NektarException(
+                    "Operation Filter `low` is not a valid blockchain operation ID."
+                )
+            params.append(int("1".ljust(low + 1, "0"), 2))
+
+        if isinstance(high, int):
+            ## for the next 64 blockchain operation
+            if high not in operations:
+                raise NektarException(
+                    "Operation Filter `high` is not a valid blockchain operation ID."
+                )
+            params.append(0)  # set to `operation_filter_low` zero
+            params.append(int("1".ljust(high + 1, "0"), 2))
+
+        return self.appbase.condenser().get_account_history(params)
+
+    def get_account_reputations(self, start, limit):
+        """Returns a list of account reputations.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_account_reputations
+
+        Parameters
+        ----------
+        start : str
+            any valid Hive account username
+        limit : int
+            limit 1-1000
+
+        Returns
+        -------
+        list:
+            List of all account reputation.
+        """
+
+        params = [start, limit]
+        if not isinstance(start, str):
+            raise NektarException("`start` must be a string.")
+        _within_range(limit, 1, 1000)
+
+        return self.appbase.condenser().get_account_reputations(params)
+
+    def get_accounts(self, accounts, delayed_votes_active):
+        """Returns accounts, queried by name.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_accounts
+
+        Parameters
+        ----------
+        accounts : list
+            a list of any valid Hive account usernames
+        delayed_votes_active : bool
+            delayed votes hidden
+
+        Returns
+        -------
+        list:
+            List of all accounts and its information.
+        """
+
+        params = [accounts, delayed_votes_active]
+        if not isinstance(accounts, list):
+            raise NektarException("`accounts` must be a list of strings.")
+        _true_or_false(delayed_votes_active)
+
+        return self.appbase.condenser().get_accounts(params)
+
+    def get_active_votes(self, author, permlink):
+        """Returns all votes for the given post.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_active_votes
+
+        Parameters
+        ----------
+        author : list
+            a list of any valid Hive account usernames
+        permlink : str
+            delayed votes hidden
+
+        Returns
+        -------
+        list:
+            List of all active votes on a post.
+        """
+
+        params = [author, permlink]
+        if not isinstance(author, str):
+            raise NektarException("`author` must be a string.")
+        if not isinstance(permlink, str):
+            raise NektarException("`permlink` must be a string.")
+
+        return self.appbase.condenser().get_active_votes(params)
+
+    def get_active_witnesses(self):
+        """Returns the list of active witnesses.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_active_witnesses
+
+        Returns
+        -------
+        list:
+            List of active witnesses.
+        """
+
+        return self.appbase.condenser().get_active_witnesses([])
+
+    def get_block(self, block_num):
+        """Returns a block.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_block
+
+        Parameters
+        ----------
+        block_num : int
+            block number
+
+        Returns
+        -------
+        dict:
+            Dictionary of block information.
+        """
+
+        if int(block_num) < 0:
+            raise NektarException("`block_num` must be a positive integer.")
+
+        return self.appbase.condenser().get_block([block_num])
+
+    def get_block_header(self, block_num):
+        """Returns a block header.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_block_header
+
+        Parameters
+        ----------
+        block_num : int
+            block number
+
+        Returns
+        -------
+        dict:
+            Dictionary of block header information.
+        """
+
+        if int(block_num) < 0:
+            raise NektarException("`block_num` must be a positive integer.")
+
+        return self.appbase.condenser().get_block_header([block_num])
+
+    def get_blog(self, account, start_entry_id, limit):
+        """Returns the list of blog entries for an account.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_blog
+
+        Parameters
+        ----------
+        account : str
+            any valid Hive account username
+        start_entry_id : int
+            post entry id
+        limit : int
+            maximum number of results 1-500
+
+        Returns
+        -------
+        list:
+            List of blogs and its information
+        """
+
+        params = [account, start_entry_id, limit]
+        if not isinstance(account, str):
+            raise NektarException("`account` must be a string.")
+        if int(start_entry_id) < 0:
+            raise NektarException("`start_entry_id` must be a positive integer.")
+        if not (1 <= int(limit) <= 500):
+            raise NektarException("`limit` must be a positive integer.")
+
+        return self.appbase.condenser().get_blog(params)
+
+    def get_blog_authors(self, account):
+        """Returns a list of authors that have had their content reblogged on a given blog account.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_blog_authors
+        
+        Issue
+        ---------
+             Assert Exception:false: Supported by hivemind
+
+        Parameters
+        ----------
+        account : str
+            any valid Hive account username
+
+        Returns
+        -------
+        dict:
+            Dictionary of block header information.
+        """
+
+        if not isinstance(account, str):
+            raise NektarException("`account` must be a string.")
+
+        return self.appbase.condenser().get_blog_authors([account])
+
+    def get_blog_entries(self, account, start_entry_id, limit):
+        """Returns a list of blog entries for an account.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_blog_entries
+
+        Parameters
+        ----------
+        account : str
+            any valid Hive account username
+        start_entry_id : int
+            post entry id
+        limit : int
+            maximum number of results 1-500
+
+        Returns
+        -------
+        list:
+            List of blogs and its basic information without the full blog data.
+        """
+
+        params = [account, start_entry_id, limit]
+        if not isinstance(account, str):
+            raise NektarException("`account` must be a string.")
+        if int(start_entry_id) < 0:
+            raise NektarException("`start_entry_id` must be a positive integer.")
+        if not (1 <= int(limit) <= 500):
+            raise NektarException("`limit` must be a positive integer.")
+
+        return self.appbase.condenser().get_blog_entries(params)
+        
     def find_proposals(self, pid):
         """Finds proposals by proposal id.
         https://developers.hive.io/apidefinitions/#condenser_api.find_proposals
@@ -216,72 +490,6 @@ class Nektar:
             params[4] = status
         
         return self.appbase.condenser().list_proposals(params)
-        
-    def get_account_count(self):
-        """Returns the number of accounts.
-
-        Returns
-        -------
-        int:
-            The total number of blockchain accounts to date.
-        """
-        
-        return self.appbase.condenser().get_account_count([])
-
-    def get_account_history(self, account, start, limit, low=None, high=None):
-        """Returns a history of all operations for a given account.
-        https://developers.hive.io/apidefinitions/#condenser_api.get_account_history
-
-        Parameters
-        ----------
-        account :
-            any valid Hive account username
-        start :
-            starting range, or -1 for reverse history (default is -1)
-        limit :
-            upperbound limit 1-1000 (default is 1000)
-        low : int, optional
-            operation id (default is None)
-        high : int, optional
-            operation id (default is None)
-
-        Returns
-        -------
-        list:
-            List of all transactions from start-limit to limit.
-        """
-
-        params = [self.username]
-        if isinstance(account, str):
-            params[0] = account
-
-        if int(start) < -1:
-            raise NektarException(
-                "`start` should be `-1` (latest history) or higher."
-            )
-        params.append(start)
-        limit = _within_range(limit, 1, 1000)
-        params.append(limit)
-
-        operations = list(range(len(BLOCKCHAIN_OPERATIONS)))
-        if isinstance(low, int):
-            ## for the first 64 blockchain operation
-            if int(low) not in operations:
-                raise NektarException(
-                    "Operation Filter `low` is not a valid blockchain operation ID."
-                )
-            params.append(int("1".ljust(low + 1, "0"), 2))
-
-        if isinstance(high, int):
-            ## for the next 64 blockchain operation
-            if high not in operations:
-                raise NektarException(
-                    "Operation Filter `high` is not a valid blockchain operation ID."
-                )
-            params.append(0)  # set to `operation_filter_low` zero
-            params.append(int("1".ljust(high + 1, "0"), 2))
-
-        return self.appbase.condenser().get_account_history(params)
 
     ##################################################
     # wrapped methods                                #
@@ -2479,7 +2687,7 @@ def _within_range(value, minimum, maximum, fallback=None):
     return value
 
 
-def _true_or_false(value, fallback):
+def _true_or_false(value, fallback=None):
     """Check if input is boolean, otherwise return fallback.
 
     Parameters
@@ -2493,6 +2701,8 @@ def _true_or_false(value, fallback):
     -------
 
     """
-    if isinstance(value, bool):
-        return value
-    return fallback
+    if not isinstance(value, bool):
+        if fallback is not None:
+            raise NektarException(f"Value must be within `True` or `False` only.")
+        return fallback
+    return value
