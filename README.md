@@ -460,6 +460,13 @@ community = "hive-1*"  # use a valid community name
 hive.new_post(title, body, description, tags, community)
 ```
 
+**Reblog a Post**
+```python
+author = "valid-username"
+permlink = "valid-permlink"
+hive.reblog(author, permlink)
+```
+
 **Reply to a Post** 
 ***WARNING:*** Do NOT abuse Hive, do not create spam comments.
 ```python
