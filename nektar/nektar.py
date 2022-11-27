@@ -363,6 +363,94 @@ class Nektar:
             raise NektarException("`limit` must be a positive integer.")
 
         return self.appbase.condenser().get_blog_entries(params)
+
+    def get_chain_properties(self):
+        """Returns the chain properties.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_chain_properties
+
+        Returns
+        -------
+        dict:
+            Dictionary of chain properties and its data.
+        """
+
+        return self.appbase.condenser().get_chain_properties([])
+
+    def get_comment_discussions_by_payout(self, tag, limit, filter_tags=None, select_authors=None, select_tags=None, truncate_body=0):
+        """Returns a list of discussions based on payout.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_comment_discussions_by_payout
+
+        Parameters
+        ----------
+        tag : str
+            any valid string
+        limit : int
+            maximum number of results
+        filter_tags : list, None
+            list of valid tags
+        select_authors : list, None
+            list of valid account username
+        select_tags : list, None
+            list of valid tags
+        truncate_body : int, optional
+            truncate body
+
+        Returns
+        -------
+        list:
+            List of comment discussions.
+        """
+
+        data = { "tag": tag,
+                "limit": limit,
+                "truncate_body": truncate_body }
+        if not isinstance(tag, str):
+            raise NektarException("`tag` must be a string.")
+        if int(limit) < 0:
+            raise NektarException("`limit` must be a positive integer.")
+        if not isinstance(filter_tags, list):
+            if filter_tags is not None:
+                raise NektarException("`filter_tags` must be a list.")
+            filter_tags = []
+        if filter_tags:
+            data["filter_tags"] = filter_tags
+        if not isinstance(select_authors, list):
+            if select_authors is not None:
+                raise NektarException("`select_authors` must be a list.")
+            select_authors = []
+        if select_authors:
+            data["select_authors"] = select_authors
+        if not isinstance(select_tags, list):
+            if select_tags is not None:
+                raise NektarException("`select_tags` must be a list.")
+            select_tags = []
+        if select_tags:
+            data["select_tags"] = select_tags
+        if int(truncate_body) not in (0, 1):
+            raise NektarException("`truncate_body` must be `0` or `1`.")
+        
+        print(data)
+
+        return self.appbase.condenser().get_comment_discussions_by_payout([data])
+        
+    def get_config(self):
+        """Returns information about compile-time constants.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_config
+        https://developers.hive.io/tutorials-recipes/understanding-configuration-values.html
+
+        Parameters
+        ----------
+        pid : int
+            proposal.id, not proposal.proposal_id
+            
+
+        Returns
+        -------
+        dict:
+            A dictionary blockchain configurations.
+        """
+        
+        return self.appbase.condenser().get_config([])
         
     def find_proposals(self, pid):
         """Finds proposals by proposal id.
@@ -602,7 +690,7 @@ class Nektar:
             return -result
         return result
 
-    def get_config(self, field=None, fallback=None):
+    def config(self, field=None, fallback=None):
         """Get low-level blockchain constants.
 
         Parameters

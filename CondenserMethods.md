@@ -100,6 +100,19 @@ result = hive.get_blog_entries("valid-username", 0, 500)
 print(json.dumps(result, indent=2))
 ```
 
+**get_chain_properties**
+```python
+result = hive.get_chain_properties()
+print(json.dumps(result, indent=2))
+```
+
+**get_comment_discussions_by_payout**
+```python
+# hive.get_comment_discussions_by_payout(tag, limit, filter_tags, select_authors, select_tags, truncate_body)
+result = hive.get_comment_discussions_by_payout("hive", 10, truncate_body=0)
+print(json.dumps(result, indent=2))
+```
+
 **list_proposal_votes, by proposal voter**
 ```python
 # hive.list_proposal_votes(pid, limit, order, direction, status)
