@@ -1365,7 +1365,7 @@ class Waggle(Nektar):
         if account is None:
             account = self.username
 
-        return get_account_history(account, start, limit, low, high)
+        return self.get_account_history(account, start, limit, low, high)
 
     def delegations(self, account=None, active=False, start=1000, inward=True):
         """Get all account delegators/delegatees and other related information.
