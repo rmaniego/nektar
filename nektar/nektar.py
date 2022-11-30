@@ -619,8 +619,6 @@ class Waggle(Nektar):
     def __init__(
         self,
         username,
-        wif=None,
-        role=None,
         wifs=None,
         nodes=None,
         chain_id=None,
@@ -637,7 +635,7 @@ class Waggle(Nektar):
             retries=retries,
             warning=warning,
         )
-        self.set_username(username, wif, role, wifs)
+        self.set_username(username, wifs)
 
         self.account = None
         self.refresh()
@@ -900,37 +898,33 @@ class Waggle(Nektar):
 
         """
 
-        params = ["", -1, 1000, 0]
-
+        params = ["", -1, 1000]
         params[0] = self.username
         if isinstance(account, str):
             params[0] = account
-
-        if int(start) < 1000 or (start % 1000 > 0):
-            raise NektarException("`start` must be a value by the factor of 1000.")
-
-        operation_id = 40  # delegate_vesting_shares_operation
-        params[3] = int("1".ljust(operation_id + 1, "0"), 2)
-
-        if not isinstance(inward, bool):
-            raise NektarException("Inward must be `True` or `False` only.")
+        # delegate_vesting_shares_operation
+        operation_id = int("1".ljust(40 + 1, "0"), 2)
+        greater_than(start, 0)
+        is_boolean(inward)
 
         key = "delegator"
         if not inward:
             key = "delegatee"
 
-        top = 0
         results = {}
         while True:
             try:
                 result = self.appbase.condenser().get_account_history(params)
             except:
-                params[1] += 1000
+                params[1] -= 1000
+                if params[1] < start:
+                    break
                 continue
             tids = [1000]
             for item in result:
-                if top == 0:
-                    tids.append(item[0])
+                tids.append(item[0])
+                if params[1] == -1:
+                    continue
                 delegation = item[1]["op"][1]
                 name = delegation[key]
                 if name == self.username:
@@ -940,11 +934,12 @@ class Waggle(Nektar):
                 results[name][item[1]["timestamp"]] = float(
                     delegation["vesting_shares"].split(" ")[0]
                 )
-            if top == 0:
-                params[1] = start
-                top = (max(tids) // 1000) * 1000
-            params[1] += 1000
-            if params[1] > top:
+            if params[1] == -1:
+                params[1] = (max(tids) // 1000) * 1000
+                params.append(operation_id)
+                continue
+            params[1] -= 1000
+            if params[1] < start:
                 break
         if active:
             active_delegations = {}
@@ -955,7 +950,7 @@ class Waggle(Nektar):
             return active_delegations
         return results
 
-    def delegators(self, account=None, active=False, start=-1):
+    def delegators(self, account=None, active=False, start=1000):
         """Get all account delegators and other related information.
 
         Parameters
@@ -974,7 +969,7 @@ class Waggle(Nektar):
 
         return self.delegations(account=account, active=active, start=start)
 
-    def delegatees(self, account=None, active=False, start=-1):
+    def delegatees(self, account=None, active=False, start=1000):
         """Get all account delegatees and other related information.
 
         Parameters
@@ -1730,8 +1725,6 @@ class Swarm(Nektar):
         self,
         community,
         username,
-        wif=None,
-        role=None,
         wifs=None,
         nodes=None,
         chain_id=None,
@@ -1748,8 +1741,7 @@ class Swarm(Nektar):
             retries=retries,
             warning=warning,
         )
-        self.set_username(username, wif, role, wifs)
-
+        self.set_username(username, wifs)
         self.account = None
         self.refresh()
 
