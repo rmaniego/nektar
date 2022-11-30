@@ -112,6 +112,9 @@ APPBASE_API = {
         "lookup_accounts",
         "lookup_witness_accounts",
         "verify_authority",
+        "find_rc_accounts",
+        "list_rc_accounts",
+        "list_rc_direct_delegations"
     ],
     "account_by_key_api": ["get_key_references"],
     "bridge": [

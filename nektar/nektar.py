@@ -12,9 +12,7 @@
 import re
 import json
 import math
-import time
 import struct
-from datetime import datetime, timezone
 from binascii import hexlify, unhexlify
 
 from .appbase import AppBase
@@ -44,10 +42,6 @@ class Nektar:
     ----------
     username :
         a valid Hive account username
-    wif :
-        the WIF or private key (Default is None)
-    role :
-        the equivalent authority of the WIF (Default is None)
     wifs :
         a dictionary of roles and their equivalent WIFs (Default is None)
     app :
@@ -69,8 +63,6 @@ class Nektar:
     def __init__(
         self,
         username,
-        wif=None,
-        role=None,
         wifs=None,
         nodes=None,
         chain_id=None,
@@ -87,7 +79,7 @@ class Nektar:
             retries=retries,
             warning=warning,
         )
-        self.set_username(username, wif, role, wifs)
+        self.set_username(username, wifs)
 
         self.account = None
         self.refresh()
@@ -98,33 +90,23 @@ class Nektar:
     ##################################################
     # wrapped methods                                #
     ##################################################
-    def set_username(self, username, wif=None, role=None, wifs=None):
+    def set_username(self, username, wifs=None):
         """Dynamically update the username and WIFs of the instance.
 
         Parameters
         ----------
         username :
             a valid Hive account username
-        wif :
-            the WIF or private key (Default is None)
-        role :
-            the equivalent authority of the WIF (Default is None)
         wifs :
             a dictionary of roles and their equivalent WIFs (Default is None)
-
-        Returns
-        -------
-
         """
+
         if not isinstance(username, str):
-            raise NektarException("Username must be a valid Hive account username.")
+            raise NektarException("`username` must be a valid Hive account username.")
         self.username = username
-
-        if isinstance(role, str) and isinstance(wif, str):
-            self.appbase.append_wif(wif, role)
-        elif isinstance(wifs, dict):
-            self.appbase.append_wif(wifs)
-
+        if not isinstance(wifs, dict):
+            raise NektarException("`wifs` must be a valid WIF dictionary.")
+        self.appbase.append_wif(wifs)
         self.roles = list(self.appbase.wifs.keys())
 
     def refresh(self):
@@ -132,6 +114,22 @@ class Nektar:
         data = self.appbase.condenser().get_accounts([[self.username]])
         if data:
             self.account = data[0]
+
+    def get_config(self, field=None, fallback=None):
+        """Returns information about compile-time constants.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_config
+        https://developers.hive.io/tutorials-recipes/understanding-configuration-values.html
+
+        Returns
+        -------
+        dict:
+            A dictionary blockchain configurations.
+        """
+
+        config = self.appbase.condenser().get_config([])
+        if field is None:
+            return config
+        return config.get(field, fallback)
 
     def resource_credits(self, account=None):
         """Get the current resource credits of an account.

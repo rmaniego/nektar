@@ -52,10 +52,6 @@ class Condenser:
         times the request retries if errors are encountered (Default is 3)
     warning :
         display warning messages (Default is False)
-
-    Returns
-    -------
-
     """
 
     def __init__(
@@ -97,7 +93,7 @@ class Condenser:
         start : int
             starting range, or -1 for reverse history
         limit : int
-            upperbound limit 1 up to 1000
+            upperbound limit from 1 up to 1000
         low : int, optional
             operation id (Default is None)
         high : int, optional
@@ -106,15 +102,12 @@ class Condenser:
         Returns
         -------
         list:
-            List of all transactions from start-limit to limit.
         """
 
-        params = [self.username]
-        if isinstance(account, str):
-            params[0] = account
-        params.append(greater_than(start, -1))
-        params.append(within_range(limit, 1, 1000))
-
+        valid_string(account)
+        greater_than(start, -1)
+        within_range(limit, 1, 1000)
+        params = [account, start, limit]
         operations = list(range(len(BLOCKCHAIN_OPERATIONS)))
         if isinstance(low, int):
             ## for the first 64 blockchain operation
@@ -144,17 +137,16 @@ class Condenser:
         start : str
             any valid Hive account username
         limit : int
-            limit 1 up to 1000
+            Maximum number of results, from 1 up to 1000.
 
         Returns
         -------
         list:
-            List of all account reputation.
         """
 
         valid_string(start)
         within_range(limit, 1, 1000)
-        params = [start, int(limit)]
+        params = [start, limit]
         return self.api.get_account_reputations(params)
 
     def get_accounts(self, accounts, delayed_votes_active):
@@ -171,14 +163,12 @@ class Condenser:
         Returns
         -------
         list:
-            List of all accounts and its information.
         """
 
         params = [accounts, delayed_votes_active]
         if not isinstance(accounts, list):
             raise NektarException("`accounts` must be a list of strings.")
-        is_boolean("delayed_votes_active", delayed_votes_active)
-
+        is_boolean(delayed_votes_active)
         return self.api.get_accounts(params)
 
     def get_active_votes(self, author, permlink):
@@ -187,7 +177,7 @@ class Condenser:
 
         Parameters
         ----------
-        author : list
+        author : str
             Author of the post.
         permlink : str
             Permlink of the post
@@ -195,7 +185,6 @@ class Condenser:
         Returns
         -------
         list:
-            List of all active votes on a post.
         """
 
         valid_string(author)
@@ -359,7 +348,7 @@ class Condenser:
         -------
         dict:
         """
-        
+
         valid_string(author)
         valid_string(permlink)
         params = [author, permlink]
@@ -387,23 +376,22 @@ class Condenser:
         params = [author, permlink]
         return self.api.get_content_replies(params)
 
-    def get_conversion_requests(self, cid):
+    def get_conversion_requests(self, account):
         """Returns a list of conversion request.
         https://developers.hive.io/apidefinitions/#condenser_api.get_conversion_requests
 
         Parameters
         ----------
-        cid : int
-            conversion request id
+        account : str
+            Any valid Hive account username.
 
         Returns
         -------
         list:
-            List of conversion requests.
         """
 
-        greater_than(cid, 0)
-        return self.api.get_conversion_requests([cid])
+        valid_string(account)
+        return self.api.get_conversion_requests([account])
 
     def get_current_median_history_price(self):
         """Returns the median history price.
@@ -415,7 +403,7 @@ class Condenser:
         """
 
         return self.api.get_current_median_history_price([])
-    
+
     def get_discussions(
         self,
         by,
@@ -453,18 +441,18 @@ class Condenser:
         list:
             List of discussions.
         """
-        
+
         valid_string(by)
         if by not in DISCUSSIONS_BY:
             raise NektarException("`by` must be a value in:", ",".join(DISCUSSIONS_BY))
-        
+
         valid_string(tag)
         within_range(limit, 1, 500)
         within_range(truncate, 0, 1)
-        
+
         # initial parameters
         data = {"tag": tag, "limit": limit, "truncate_body": truncate}
-        
+
         # custom filters
         if not isinstance(filter_tags, list):
             if filter_tags is not None:
@@ -541,7 +529,7 @@ class Condenser:
         list:
             List of discussions.
         """
-        
+
         by = "active"
         return self.get_discussions(
             by,
@@ -584,7 +572,7 @@ class Condenser:
         list:
             List of discussions.
         """
-        
+
         by = "blog"
         return self.get_discussions(
             by,
@@ -627,7 +615,7 @@ class Condenser:
         list:
             List of discussions.
         """
-        
+
         by = "cashout"
         return self.get_discussions(
             by,
@@ -670,7 +658,7 @@ class Condenser:
         list:
             List of discussions.
         """
-        
+
         by = "children"
         return self.get_discussions(
             by,
@@ -713,7 +701,7 @@ class Condenser:
         list:
             List of discussions.
         """
-        
+
         by = "created"
         return self.get_discussions(
             by,
@@ -756,7 +744,7 @@ class Condenser:
         list:
             List of discussions.
         """
-        
+
         by = "hot"
         return self.get_discussions(
             by,
@@ -766,7 +754,7 @@ class Condenser:
             select_authors,
             select_tags,
             truncate)
-    
+
     def get_discussions_by_promoted(
         self,
         tag,
@@ -799,7 +787,7 @@ class Condenser:
         list:
             List of discussions.
         """
-        
+
         by = "promoted"
         return self.get_discussions(
             by,
@@ -809,7 +797,7 @@ class Condenser:
             select_authors,
             select_tags,
             truncate)
-    
+
     def get_discussions_by_trending(
         self,
         tag,
@@ -842,7 +830,7 @@ class Condenser:
         list:
             List of discussions.
         """
-        
+
         by = "trending"
         return self.get_discussions(
             by,
@@ -852,7 +840,7 @@ class Condenser:
             select_authors,
             select_tags,
             truncate)
-    
+
     def get_discussions_by_votes(
         self,
         tag,
@@ -885,7 +873,7 @@ class Condenser:
         list:
             List of discussions.
         """
-        
+
         by = "votes"
         return self.get_discussions(
             by,
@@ -927,7 +915,7 @@ class Condenser:
         -------
         list:
         """
-        
+
         by = "payout"
         comment = True
         return self.get_discussions(
@@ -971,7 +959,7 @@ class Condenser:
         -------
         list:
         """
-        
+
         by = "payout"
         return self.get_discussions(
             by,
@@ -1092,7 +1080,7 @@ class Condenser:
         Parameters
         ----------
         account : str
-            any valid Hive account.
+            Any valid Hive account username.
         eid : int
             escrow id
 
@@ -1106,15 +1094,15 @@ class Condenser:
         return self.api.get_escrow([account, eid])
 
     def get_expiring_vesting_delegations(self, account, after):
-        """Returns the expiring vesting delegations for an account. 
+        """Returns the expiring vesting delegations for an account.
         https://developers.hive.io/apidefinitions/#condenser_api.get_expiring_vesting_delegations
 
         Parameters
         ----------
         account : str
-            any valid Hive account.
+            Any valid Hive account username.
         after : str
-            valid blockchain timestamp, e.g. "2018-01-01T00:00:00"
+            Valid blockchain timestamp, e.g. "2018-01-01T00:00:00"
 
         Returns
         -------
@@ -1126,7 +1114,7 @@ class Condenser:
         return self.api.get_expiring_vesting_delegations([account, after])
 
     def get_feed(self, account, eid, limit):
-        """Returns a list of items in an account’s feed. 
+        """Returns a list of items in an account’s feed.
         https://developers.hive.io/apidefinitions/#condenser_api.get_feed
 
         Parameters
@@ -1197,12 +1185,12 @@ class Condenser:
         -------
         dict:
         """
-        
+
         valid_string(account)
         return self.api.get_follow_count([account])
 
     def get_followers(self, account, start, ftype, limit):
-        """Returns the list of followers for an account. 
+        """Returns the list of followers for an account.
         https://developers.hive.io/apidefinitions/#condenser_api.get_followers
 
         Parameters
@@ -1220,7 +1208,7 @@ class Condenser:
         -------
         list:
         """
-        
+
         valid_string(account)
         valid_string(start)
         valid_string(ftype)
@@ -1229,7 +1217,7 @@ class Condenser:
         return self.api.get_followers(params)
 
     def get_following(self, account, start, ftype, limit):
-        """Returns the list of accounts that are following an account. 
+        """Returns the list of accounts that are following an account.
         https://developers.hive.io/apidefinitions/#condenser_api.get_following
 
         Parameters
@@ -1247,7 +1235,7 @@ class Condenser:
         -------
         list:
         """
-        
+
         valid_string(account)
         valid_string(start)
         valid_string(ftype)
@@ -1279,7 +1267,7 @@ class Condenser:
         -------
         list:
         """
-        
+
         params = [[keys]]
         if not isinstance(keys, str):
             if not isinstance(keys, list):
@@ -1298,17 +1286,17 @@ class Condenser:
         seconds : int
             bucket seconds: 15, 60 (1 minute), 300 (5 mins), 3600 (1 hour), 86400 (1 day)
         start : str
-            Starting valid blockchain timestamp, e.g. "2017-01-01T00:00:00"
+            Valid starting blockchain timestamp, e.g. "2017-01-01T00:00:00"
         end : str
-            Ending valid blockchain timestamp, e.g. "2018-01-01T00:00:00"
+            Valid ending blockchain timestamp, e.g. "2018-01-01T00:00:00"
 
         Returns
         -------
         list:
         """
-        
+
         greater_than(seconds, 0)
-        if seconds in (15, 60, 300, 3600, 86400):
+        if seconds not in (15, 60, 300, 3600, 86400):
             raise NektarException("`seconds` is not supported, see get_market_history_buckets.")
         valid_string(start, RE_DATETIME)
         valid_string(end, RE_DATETIME)
@@ -1391,7 +1379,7 @@ class Condenser:
         return self.api.get_order_book([limit])
 
     def get_owner_history(self, account):
-        """Returns the owner history of an account. 
+        """Returns the owner history of an account.
         https://developers.hive.io/apidefinitions/#condenser_api.get_owner_history
 
         Parameters
@@ -1414,8 +1402,8 @@ class Condenser:
 
         Parameters
         ----------
-        account : dict
-            any valid unsigned transaction.
+        transaction : dict
+            Any valid unsigned transaction.
 
         Returns
         -------
@@ -1427,7 +1415,7 @@ class Condenser:
         return self.api.get_potential_signatures([transaction])
 
     def get_reblogged_by(self, author, permlink):
-        """Returns a list of authors that have reblogged a post. 
+        """Returns a list of authors that have reblogged a post.
         https://developers.hive.io/apidefinitions/#condenser_api.get_reblogged_by
 
         Parameters
@@ -1445,6 +1433,468 @@ class Condenser:
         valid_string(author)
         valid_string(permlink, RE_PERMLINK)
         return self.api.get_reblogged_by([author, permlink])
+
+    def get_recent_trades(self, limit):
+        """Returns the most recent trades for the internal HBD:HIVE market.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_recent_trades
+
+        Parameters
+        ----------
+        limit : int
+            Maximum number of results, from 1 up to 1000.
+
+        Returns
+        -------
+        list:
+        """
+
+        within_range(limit, 1, 1000)
+        return self.api.get_recent_trades([limit])
+
+    def get_recovery_request(self, account):
+        """Returns the recovery request for an account.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_recovery_request
+
+        Parameters
+        ----------
+        account : str
+            Any valid Hive account username.
+
+        Returns
+        -------
+        null:
+        """
+
+        valid_string(account)
+        return self.api.get_recovery_request([account])
+
+    def get_replies_by_last_update(self, author, permlink, limit):
+        """Returns a list of replies by last update.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_replies_by_last_update
+
+        Parameters
+        ----------
+        author : str
+            Start pattern for the post author.
+        permlink : str
+            Start pattern for the post permlink.
+        limit : int
+            Maximum number of results, from 1 up to 100.
+
+        Returns
+        -------
+        list:
+        """
+
+        valid_string(author)
+        # allow empty permlink
+        valid_string(permlink)
+        within_range(limit, 1, 100)
+        return self.api.get_replies_by_last_update([author, permlink, limit])
+
+    def get_required_signatures(self, transaction, keys):
+        """This API will take a partially signed transaction
+        and a set of public keys that the owner has the ability
+        to sign for and return the minimal subset of public keys
+        that should add signatures to the transaction.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_required_signatures
+
+        Parameters
+        ----------
+        account : dict
+            any valid unsigned transaction.
+
+        Returns
+        -------
+        list:
+        """
+
+        if not isinstance(transaction, dict):
+            raise NektarException("`transaction` must be a dictionary.")
+        if not isinstance(keys, list):
+            raise NektarException("`keys` must be a list of strings.")
+        if not all([0 for k in keys if not isinstance(k, str)]):
+            raise NektarException("`keys` must be a list of strings.")
+        return self.api.get_required_signatures([transaction, keys])
+
+    def get_reward_fund(self, action):
+        """Returns information about the current reward funds.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_reward_fund
+
+        Parameters
+        ----------
+        action : str
+            `post`
+
+        Returns
+        -------
+        null:
+        """
+
+        valid_string(action)
+        return self.api.get_reward_fund([action])
+
+    def get_savings_withdraw_from(self, account):
+        """Returns savings withdraw from an account.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_savings_withdraw_from
+
+        Parameters
+        ----------
+        account : str
+            Any valid Hive account username.
+
+        Returns
+        -------
+        list:
+        """
+
+        valid_string(account)
+        return self.api.get_savings_withdraw_from([account])
+
+    def get_savings_withdraw_to(self, account):
+        """Returns savings withdraw from an account.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_savings_withdraw_to
+
+        Parameters
+        ----------
+        account : str
+            Any valid Hive account username.
+
+        Returns
+        -------
+        list:
+        """
+
+        valid_string(account)
+        return self.api.get_savings_withdraw_to([account])
+
+    def get_tags_used_by_author(self, account):
+        """Returns a list of tags used by an author.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_tags_used_by_author
+
+        Parameters
+        ----------
+        account : str
+            Any valid Hive account username.
+
+        Returns
+        -------
+        list:
+        """
+
+        valid_string(account)
+        return self.api.get_tags_used_by_author([account])
+
+    def get_ticker(self):
+        """Returns the market ticker for the internal HBD:HIVE market.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_ticker
+
+        Returns
+        -------
+        dict:
+        """
+
+        return self.api.get_ticker([])
+
+    def get_trade_history(self, start, end, limit):
+        """Returns the expiring vesting delegations for an account.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_trade_history
+
+        Parameters
+        ----------
+        start : str
+            Valid starting blockchain timestamp, e.g. "2017-01-01T00:00:00"
+        end : str
+            Valid ending blockchain timestamp, e.g. "2018-01-01T00:00:00"
+        limit : int
+            Maximum number of results, from 1 up to 100.
+
+        Returns
+        -------
+        list:
+        """
+
+        valid_string(start, RE_DATETIME)
+        valid_string(end, RE_DATETIME)
+        within_range(limit, 1, 1000)
+        return self.api.get_trade_history([start, end, limit])
+
+    def get_transaction(self, tid):
+        """Returns the details of a transaction based on a transaction id.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_transaction
+
+        Parameters
+        ----------
+        tid : str
+            Any valid transaction id.
+
+        Returns
+        -------
+        list:
+        """
+
+        valid_string(tid)
+        return self.api.get_transaction([tid])
+
+    def get_transaction_hex(self, transaction):
+        """This API will take a partially signed transaction
+        and a set of public keys that the owner has the ability
+        to sign for and return the minimal subset of public keys
+        that should add signatures to the transaction.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_transaction_hex
+
+        Parameters
+        ----------
+        transaction : dict
+            Any valid unsigned transaction.
+
+        Returns
+        -------
+        str:
+        """
+
+        if not isinstance(transaction, dict):
+            raise NektarException("`transaction` must be a dictionary.")
+        return self.api.get_transaction_hex([transaction])
+
+    def get_trending_tags(self, start, limit):
+        """Returns the list of trending tags.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_trending_tags
+
+        Parameters
+        ----------
+        start : str
+            Starting pattern for tags.
+        limit : int
+            Maximum number of results, from 1 up to 100.
+
+        Returns
+        -------
+        list:
+        """
+
+        valid_string(start)
+        within_range(limit, 1, 100)
+        return self.api.get_trending_tags([start, limit])
+
+    def get_version(self):
+        """Returns the versions of blockchain, hive, and FC.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_version
+
+        Returns
+        -------
+        dict:
+        """
+
+
+        return self.api.get_version([])
+
+    def get_vesting_delegations(self, account, start, limit):
+        """Returns the vesting delegations by an account.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_vesting_delegations
+
+        Parameters
+        ----------
+        account : str
+            Any valid Hive account username, delegator.
+        start : str
+            Starting pattern for delegatee username.
+        limit : int
+            Maximum number of results, from 1 up to 1000.
+
+        Returns
+        -------
+        list:
+        """
+
+        valid_string(account)
+        valid_string(start)
+        within_range(limit, 1, 100)
+        return self.api.get_vesting_delegations([account, start, limit])
+
+    def get_volume(self):
+        """Returns the market volume for the past 24 hours.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_volume
+
+        Returns
+        -------
+        dict:
+        """
+
+
+        return self.api.get_volume([])
+
+    def get_withdraw_routes(self, account, route):
+        """Returns the withdraw routes for an account.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_withdraw_routes
+
+        Parameters
+        ----------
+        account : str
+            Any valid Hive account username, delegator.
+        rout : str
+            `all`, `outgoing`, or `incoming
+
+        Returns
+        -------
+        list:
+        """
+
+        valid_string(account)
+        valid_string(route)
+        routes = ("incoming", "outgoing", "all")
+        if route not in routes:
+            raise NektarException("`route` must be a value in:", ",".join(routes))
+        return self.api.get_withdraw_routes([account, route])
+
+    def get_witness_by_account(self, account):
+        """Returns the witness of an account.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_witness_by_account
+
+        Parameters
+        ----------
+        account : str
+            Any valid Hive account username.
+
+        Returns
+        -------
+        null:
+        """
+
+        valid_string(account)
+        return self.api.get_witness_by_account([account])
+
+    def get_witness_count(self):
+        """Return the number of witnesses.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_witness_count
+
+        Returns
+        -------
+        int:
+        """
+
+        return self.api.get_witness_count([])
+
+    def get_witness_schedule(self):
+        """Returns the current witness schedule.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_witness_schedule
+
+        Returns
+        -------
+        list:
+        """
+
+        return self.api.get_witness_schedule([])
+
+    def get_witnesses(self, indices):
+        """Returns current witnesses.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_witnesses
+
+        Parameters
+        ----------
+        indices : int, list
+            List of integers, from 0 up to the current number of witnesses.
+
+        Returns
+        -------
+        list:
+        """
+
+        params = [[indices]]
+        if not isinstance(indices, int):
+            if not isinstance(indices, list):
+                raise NektarException("`indices` must be a list of integers.")
+            if not all([0 for i in indices if not isinstance(i, int)]):
+                raise NektarException("`indices` must be a list of integers.")
+            params = [indices]
+
+        return self.api.get_witnesses(params)
+
+    def get_witnesses_by_vote(self, start, limit):
+        """Returns current witnesses by vote.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_witnesses_by_vote
+
+        Parameters
+        ----------
+        start : str
+            Starting pattern for witness username.
+        limit : int
+            Maximum number of results, from 1 up to 1000.
+
+        Returns
+        -------
+        list:
+        """
+
+        valid_string(start)
+        within_range(limit, 1, 1000)
+        return self.api.get_witnesses_by_vote([start, limit])
+
+    def lookup_account_names(self, accounts, delayed_votes_active):
+        """Returns accounts, queried by name.
+        https://developers.hive.io/apidefinitions/#condenser_api.lookup_account_names
+
+        Parameters
+        ----------
+        accounts : list
+            a list of any valid Hive account usernames
+        delayed_votes_active : bool
+            delayed votes active
+
+        Returns
+        -------
+        list:
+        """
+
+        params = [[accounts], delayed_votes_active]
+        is_boolean(delayed_votes_active)
+        if not isinstance(accounts, str):
+            if not isinstance(accounts, list):
+                raise NektarException("`accounts` must be a list of strings.")
+            if not all([0 for k in accounts if not isinstance(k, str)]):
+                raise NektarException("`accounts` must be a list of strings.")
+            params[0] = accounts
+        return self.api.lookup_account_names(params)
+
+    def lookup_accounts(self, start, limit):
+        """Looks up accounts starting with name.
+        https://developers.hive.io/apidefinitions/#condenser_api.lookup_accounts
+
+        Parameters
+        ----------
+        start : str
+            Starting pattern for Hive account username.
+        limit : int
+            Maximum number of results, from 1 up to 1000.
+
+        Returns
+        -------
+        list:
+        """
+
+        valid_string(start)
+        within_range(limit, 1, 1000)
+        return self.api.lookup_accounts([start, limit])
+
+    def lookup_witness_accounts(self, start, limit):
+        """Looks up witness accounts starting with name. 
+        https://developers.hive.io/apidefinitions/#condenser_api.lookup_witness_accounts
+
+        Parameters
+        ----------
+        start : str
+            Starting pattern for Hive account username.
+        limit : int
+            Maximum number of results, from 1 up to 1000.
+
+        Returns
+        -------
+        list:
+        """
+
+        valid_string(start)
+        within_range(limit, 1, 1000)
+        return self.api.lookup_witness_accounts([start, limit])
 
     def find_proposals(self, pid):
         """Finds proposals by proposal id.
@@ -1562,3 +2012,121 @@ class Condenser:
             params[4] = status
 
         return self.api.list_proposals(params)
+
+    def is_known_transaction(self, tid):
+        """Only return true if the transaction has not expired
+        or been invalidated. If this method is called
+        with a VERY old transaction we will return false,
+        use account_history_api.get_transaction.
+        https://developers.hive.io/apidefinitions/#condenser_api.is_known_transaction
+
+        Parameters
+        ----------
+        tid : str
+            Any valid transaction id.
+
+        Returns
+        -------
+        list:
+        """
+
+        valid_string(tid)
+        return self.api.is_known_transaction([tid])
+
+    def get_collateralized_conversion_requests(self, account):
+        """Returns objects corresponding with `collateralized_convert` operations.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_collateralized_conversion_requests
+
+        Parameters
+        ----------
+        account : str
+            Any valid Hive account username.
+
+        Returns
+        -------
+        list:
+        """
+
+        valid_string(account)
+        return self.api.get_collateralized_conversion_requests([account])
+
+    def find_recurrent_transfers(self, account):
+        """Finds transfers of any liquid asset every fixed amount of time from one account to another.
+        https://developers.hive.io/apidefinitions/#condenser_api.find_recurrent_transfers
+
+        Parameters
+        ----------
+        account : str
+            Any valid Hive account username.
+
+        Returns
+        -------
+        list:
+        """
+
+        valid_string(account)
+        return self.api.find_recurrent_transfers([account])
+
+    def find_rc_accounts(self, accounts):
+        """Find RC delegations from accounts.
+        https://developers.hive.io/apidefinitions/#condenser_api.find_rc_accounts
+
+        Parameters
+        ----------
+        accounts : list
+            a list of any valid Hive account usernames
+
+        Returns
+        -------
+        list:
+        """
+
+        params = [[accounts]]
+        if not isinstance(accounts, str):
+            if not isinstance(accounts, list):
+                raise NektarException("`accounts` must be a list of strings.")
+            if not all([0 for k in accounts if not isinstance(k, str)]):
+                raise NektarException("`accounts` must be a list of strings.")
+            params[0] = accounts
+        return self.api.find_rc_accounts(params)
+
+    def list_rc_accounts(self, start, limit):
+        """List all RC delegations starting from the specified account.
+        https://developers.hive.io/apidefinitions/#condenser_api.list_rc_accounts
+
+        Parameters
+        ----------
+        start : str
+            Hive account username, lower bound.
+        limit : int
+            Maximum number of results, from 1 up to ?.
+
+        Returns
+        -------
+        list:
+        """
+        
+        valid_string(start)
+        within_range(limit, 1, 1000)
+        return self.api.list_rc_accounts([start, limit])
+
+    def list_rc_direct_delegations(self, delegator, delegatee, limit):
+        """List all RC delegations starting from the specified account.
+        https://developers.hive.io/apidefinitions/#condenser_api.list_rc_direct_delegations
+
+        Parameters
+        ----------
+        account : str
+            Hive account username, lower bound.
+        limit : int
+            Maximum number of results, from 1 up to ?.
+
+        Returns
+        -------
+        list:
+        """
+        
+        valid_string(delegator)
+        valid_string(delegatee)
+        within_range(limit, 1, 1000)
+        return self.api.list_rc_direct_delegations([[delegator, delegatee], limit])
