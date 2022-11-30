@@ -104,10 +104,11 @@ class Nektar:
         if not isinstance(username, str):
             raise NektarException("`username` must be a valid Hive account username.")
         self.username = username
-        if not isinstance(wifs, dict):
-            raise NektarException("`wifs` must be a valid WIF dictionary.")
-        self.appbase.append_wif(wifs)
-        self.roles = list(self.appbase.wifs.keys())
+        if wifs is not None:
+            if not isinstance(wifs, dict):
+                raise NektarException("`wifs` must be a valid WIF dictionary.")
+            self.appbase.append_wif(wifs)
+            self.roles = list(self.appbase.wifs.keys())
 
     def refresh(self):
         """Get a more recent version of the account data."""
