@@ -24,6 +24,9 @@ from .constants import (
     ASSETS,
     ROLES,
     DATETIME_FORMAT,
+    RE_PERMLINK,
+    RE_COMMUNITY,
+    RE_DATETIME
 )
 from .exceptions import NektarException
 
@@ -37,21 +40,21 @@ class Nektar:
     username :
         a valid Hive account username
     wif :
-        the WIF or private key (default is None)
+        the WIF or private key (Default is None)
     role :
-        the equivalent authority of the WIF (default is None)
+        the equivalent authority of the WIF (Default is None)
     wifs :
-        a dictionary of roles and their equivalent WIFs (default is None)
+        a dictionary of roles and their equivalent WIFs (Default is None)
     app :
-        the name of the app built with nektar (default is None)
+        the name of the app built with nektar (Default is None)
     version :
-        the version `x.y.x` of the app built with nektar (default is None)
+        the version `x.y.x` of the app built with nektar (Default is None)
     timeout :
-        seconds before the request is dropped (default is 10)
+        seconds before the request is dropped (Default is 10)
     retries :
-        times the request retries if errors are encountered (default is 3)
+        times the request retries if errors are encountered (Default is 3)
     warning :
-        display warning messages (default is False)
+        display warning messages (Default is False)
 
     Returns
     -------
@@ -86,7 +89,7 @@ class Nektar:
 
         # lazy mode
         self.config = None
-    
+
     ##################################################
     # raw condenser api methods                      #
     ##################################################
@@ -99,7 +102,7 @@ class Nektar:
         int:
             The total number of blockchain accounts to date.
         """
-        
+
         return self.appbase.condenser().get_account_count([])
 
     def get_account_history(self, account, start, limit, low=None, high=None):
@@ -115,9 +118,9 @@ class Nektar:
         limit : int
             upperbound limit 1-1000
         low : int, optional
-            operation id (default is None)
+            operation id (Default is None)
         high : int, optional
-            operation id (default is None)
+            operation id (Default is None)
 
         Returns
         -------
@@ -128,14 +131,8 @@ class Nektar:
         params = [self.username]
         if isinstance(account, str):
             params[0] = account
-
-        if int(start) < -1:
-            raise NektarException(
-                "`start` should be `-1` (latest history) or higher."
-            )
-        params.append(start)
-        limit = _within_range(limit, 1, 1000)
-        params.append(limit)
+        params.append(_greater_than(start, -1))
+        params.append(_within_range(limit, 1, 1000))
 
         operations = list(range(len(BLOCKCHAIN_OPERATIONS)))
         if isinstance(low, int):
@@ -174,11 +171,9 @@ class Nektar:
             List of all account reputation.
         """
 
-        params = [start, limit]
-        if not isinstance(start, str):
-            raise NektarException("`start` must be a string.")
+        _valid_string(start)
         _within_range(limit, 1, 1000)
-
+        params = [start, int(limit)]
         return self.appbase.condenser().get_account_reputations(params)
 
     def get_accounts(self, accounts, delayed_votes_active):
@@ -201,7 +196,7 @@ class Nektar:
         params = [accounts, delayed_votes_active]
         if not isinstance(accounts, list):
             raise NektarException("`accounts` must be a list of strings.")
-        _true_or_false(delayed_votes_active)
+        _is_boolean("delayed_votes_active", delayed_votes_active)
 
         return self.appbase.condenser().get_accounts(params)
 
@@ -212,9 +207,9 @@ class Nektar:
         Parameters
         ----------
         author : list
-            a list of any valid Hive account usernames
+            Author of the post.
         permlink : str
-            delayed votes hidden
+            Permlink of the post
 
         Returns
         -------
@@ -222,12 +217,9 @@ class Nektar:
             List of all active votes on a post.
         """
 
+        _valid_string(author)
+        _valid_string(permlink)
         params = [author, permlink]
-        if not isinstance(author, str):
-            raise NektarException("`author` must be a string.")
-        if not isinstance(permlink, str):
-            raise NektarException("`permlink` must be a string.")
-
         return self.appbase.condenser().get_active_votes(params)
 
     def get_active_witnesses(self):
@@ -257,10 +249,8 @@ class Nektar:
             Dictionary of block information.
         """
 
-        if int(block_num) < 0:
-            raise NektarException("`block_num` must be a positive integer.")
-
-        return self.appbase.condenser().get_block([block_num])
+        _greater_than(block_num, 0)
+        return self.appbase.condenser().get_block([int(block_num)])
 
     def get_block_header(self, block_num):
         """Returns a block header.
@@ -277,12 +267,10 @@ class Nektar:
             Dictionary of block header information.
         """
 
-        if int(block_num) < 0:
-            raise NektarException("`block_num` must be a positive integer.")
-
+        _greater_than(block_num, 0)
         return self.appbase.condenser().get_block_header([block_num])
 
-    def get_blog(self, account, start_entry_id, limit):
+    def get_blog(self, account, start, limit):
         """Returns the list of blog entries for an account.
         https://developers.hive.io/apidefinitions/#condenser_api.get_blog
 
@@ -290,8 +278,8 @@ class Nektar:
         ----------
         account : str
             any valid Hive account username
-        start_entry_id : int
-            post entry id
+        start : int
+            starting entry id
         limit : int
             maximum number of results 1-500
 
@@ -301,20 +289,16 @@ class Nektar:
             List of blogs and its information
         """
 
-        params = [account, start_entry_id, limit]
-        if not isinstance(account, str):
-            raise NektarException("`account` must be a string.")
-        if int(start_entry_id) < 0:
-            raise NektarException("`start_entry_id` must be a positive integer.")
-        if not (1 <= int(limit) <= 500):
-            raise NektarException("`limit` must be a positive integer.")
-
+        _valid_string(account)
+        start = _greater_than(start, 0)
+        limit = _within_range(limit, 1, 500)
+        params = [account, start, limit]
         return self.appbase.condenser().get_blog(params)
 
     def get_blog_authors(self, account):
         """Returns a list of authors that have had their content reblogged on a given blog account.
         https://developers.hive.io/apidefinitions/#condenser_api.get_blog_authors
-        
+
         Issue
         ---------
              Assert Exception:false: Supported by hivemind
@@ -330,12 +314,10 @@ class Nektar:
             Dictionary of block header information.
         """
 
-        if not isinstance(account, str):
-            raise NektarException("`account` must be a string.")
-
+        _valid_string(account)
         return self.appbase.condenser().get_blog_authors([account])
 
-    def get_blog_entries(self, account, start_entry_id, limit):
+    def get_blog_entries(self, account, start, limit):
         """Returns a list of blog entries for an account.
         https://developers.hive.io/apidefinitions/#condenser_api.get_blog_entries
 
@@ -343,8 +325,8 @@ class Nektar:
         ----------
         account : str
             any valid Hive account username
-        start_entry_id : int
-            post entry id
+        start : int
+            starting entry id
         limit : int
             maximum number of results 1-500
 
@@ -354,14 +336,10 @@ class Nektar:
             List of blogs and its basic information without the full blog data.
         """
 
-        params = [account, start_entry_id, limit]
-        if not isinstance(account, str):
-            raise NektarException("`account` must be a string.")
-        if int(start_entry_id) < 0:
-            raise NektarException("`start_entry_id` must be a positive integer.")
-        if not (1 <= int(limit) <= 500):
-            raise NektarException("`limit` must be a positive integer.")
-
+        _valid_string(account)
+        start = _greater_than(start, 0)
+        limit = _within_range(limit, 1, 500)
+        params = [account, start, limit]
         return self.appbase.condenser().get_blog_entries(params)
 
     def get_chain_properties(self):
@@ -376,7 +354,15 @@ class Nektar:
 
         return self.appbase.condenser().get_chain_properties([])
 
-    def get_comment_discussions_by_payout(self, tag, limit, filter_tags=None, select_authors=None, select_tags=None, truncate_body=0):
+    def get_comment_discussions_by_payout(
+        self,
+        tag,
+        limit,
+        filter_tags=None,
+        select_authors=None,
+        select_tags=None,
+        truncate=0,
+    ):
         """Returns a list of discussions based on payout.
         https://developers.hive.io/apidefinitions/#condenser_api.get_comment_discussions_by_payout
 
@@ -392,22 +378,18 @@ class Nektar:
             list of valid account username
         select_tags : list, None
             list of valid tags
-        truncate_body : int, optional
-            truncate body
+        truncate : int, optional
+            truncate body (0, 1)
 
         Returns
         -------
         list:
-            List of comment discussions.
+            List of discussions.
         """
 
-        data = { "tag": tag,
-                "limit": limit,
-                "truncate_body": truncate_body }
-        if not isinstance(tag, str):
-            raise NektarException("`tag` must be a string.")
-        if int(limit) < 0:
-            raise NektarException("`limit` must be a positive integer.")
+        data = {"tag": tag, "limit": limit, "truncate_body": truncate}
+        _valid_string(tag)
+        _within_range(limit, 1, 500)
         if not isinstance(filter_tags, list):
             if filter_tags is not None:
                 raise NektarException("`filter_tags` must be a list.")
@@ -426,13 +408,10 @@ class Nektar:
             select_tags = []
         if select_tags:
             data["select_tags"] = select_tags
-        if int(truncate_body) not in (0, 1):
-            raise NektarException("`truncate_body` must be `0` or `1`.")
-        
-        print(data)
-
+        if int(truncate) not in (0, 1):
+            raise NektarException("`truncate` must be `0` or `1`.")
         return self.appbase.condenser().get_comment_discussions_by_payout([data])
-        
+
     def get_config(self):
         """Returns information about compile-time constants.
         https://developers.hive.io/apidefinitions/#condenser_api.get_config
@@ -442,16 +421,438 @@ class Nektar:
         ----------
         pid : int
             proposal.id, not proposal.proposal_id
-            
+
 
         Returns
         -------
         dict:
             A dictionary blockchain configurations.
         """
-        
+
         return self.appbase.condenser().get_config([])
+
+    def get_content(self, author, permlink):
+        """Returns the content of a post or comment.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_content
+
+        Parameters
+        ----------
+        author : list
+            Author of the post.
+        permlink : str
+            Permlink of the post
+
+        Returns
+        -------
+        dict:
+            All data associated to a post or comment.
+        """
         
+        _valid_string(author)
+        _valid_string(permlink)
+        params = [author, permlink]
+        return self.appbase.condenser().get_content(params)
+
+    def get_content_replies(self, author, permlink):
+        """Returns a list of replies.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_content_replies
+
+        Parameters
+        ----------
+        author : list
+            Author of the post.
+        permlink : str
+            Permlink of the post
+
+        Returns
+        -------
+        list:
+            List of replies to a post or comment.
+        """
+
+        _valid_string(author)
+        _valid_string(permlink)
+        params = [author, permlink]
+        return self.appbase.condenser().get_content_replies(params)
+
+    def get_conversion_requests(self, cid):
+        """Returns a list of conversion request.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_conversion_requests
+
+        Parameters
+        ----------
+        cid : int
+            conversion request id
+
+        Returns
+        -------
+        list:
+            List of conversion requests.
+        """
+
+        _greater_than(cid, 0)
+        return self.appbase.condenser().get_conversion_requests([cid])
+
+    def get_current_median_history_price(self):
+        """Returns the median history price.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_current_median_history_price
+
+        Returns
+        -------
+        dict:
+            Data on the median history price.
+        """
+
+        return self.appbase.condenser().get_current_median_history_price([])
+
+    def get_discussions_by_active(
+        self,
+        tag,
+        limit,
+        filter_tags=None,
+        select_authors=None,
+        select_tags=None,
+        truncate=0,
+    ):
+        """Returns a list of discussions based on active.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_discussions_by_active
+
+        Parameters
+        ----------
+        tag : str
+            any valid string
+        limit : int
+            maximum number of results
+        filter_tags : list, None
+            list of valid tags
+        select_authors : list, None
+            list of valid account username
+        select_tags : list, None
+            list of valid tags
+        truncate : int, optional
+            truncate body (0, 1)
+
+        Returns
+        -------
+        list:
+            List of discussions.
+        """
+
+        data = {"tag": tag, "limit": limit, "truncate_body": truncate}
+        _valid_string(tag)
+        _within_range(limit, 1, 500)
+        if not isinstance(filter_tags, list):
+            if filter_tags is not None:
+                raise NektarException("`filter_tags` must be a list.")
+            filter_tags = []
+        if filter_tags:
+            data["filter_tags"] = filter_tags
+        if not isinstance(select_authors, list):
+            if select_authors is not None:
+                raise NektarException("`select_authors` must be a list.")
+            select_authors = []
+        if select_authors:
+            data["select_authors"] = select_authors
+        if not isinstance(select_tags, list):
+            if select_tags is not None:
+                raise NektarException("`select_tags` must be a list.")
+            select_tags = []
+        if select_tags:
+            data["select_tags"] = select_tags
+        if int(truncate) not in (0, 1):
+            raise NektarException("`truncate` must be `0` or `1`.")
+        return self.appbase.condenser().get_discussions_by_active([data])
+
+    def get_discussions_by_author_before_date(self, author, permlink, date, limit):
+        """Returns a list of discussions based on author before date.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_discussions_by_author_before_date
+
+        Parameters
+        ----------
+        author : list
+            Author of the post.
+        permlink : str
+            Permlink of the post
+        date : str
+            Date before e.g. 1970-01-01T00:00:00
+        limit : int
+            Maximum number of results.
+
+        Returns
+        -------
+        list:
+            List of posts and it corresponding data.
+        """
+
+        _valid_string(author)
+        _valid_string(permlink)
+        _valid_string(date, RE_DATETIME)
+        _greater_than(limit, 0)
+        params = [author, permlink, date, limit]
+        return self.appbase.condenser().get_discussions_by_author_before_date(params)
+
+    def get_discussions_by_blog(
+        self,
+        tag,
+        limit,
+        filter_tags=None,
+        select_authors=None,
+        select_tags=None,
+        truncate=0,
+    ):
+        """Returns a list of discussions by blog.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_discussions_by_blog
+
+        Parameters
+        ----------
+        tag : str
+            any valid string
+        limit : int
+            maximum number of results
+        filter_tags : list, None
+            list of valid tags
+        select_authors : list, None
+            list of valid account username
+        select_tags : list, None
+            list of valid tags
+        truncate : int, optional
+            truncate body (0, 1)
+
+        Returns
+        -------
+        list:
+            List of discussions.
+        """
+
+        data = {"tag": tag, "limit": limit, "truncate_body": truncate}
+        _valid_string(tag)
+        _within_range(limit, 1, 500)
+        if not isinstance(filter_tags, list):
+            if filter_tags is not None:
+                raise NektarException("`filter_tags` must be a list.")
+            filter_tags = []
+        if filter_tags:
+            data["filter_tags"] = filter_tags
+        if not isinstance(select_authors, list):
+            if select_authors is not None:
+                raise NektarException("`select_authors` must be a list.")
+            select_authors = []
+        if select_authors:
+            data["select_authors"] = select_authors
+        if not isinstance(select_tags, list):
+            if select_tags is not None:
+                raise NektarException("`select_tags` must be a list.")
+            select_tags = []
+        if select_tags:
+            data["select_tags"] = select_tags
+        if int(truncate) not in (0, 1):
+            raise NektarException("`truncate` must be `0` or `1`.")
+        return self.appbase.condenser().get_discussions_by_blog([data])
+
+    def get_discussions_by_cashout(
+        self,
+        tag,
+        limit,
+        filter_tags=None,
+        select_authors=None,
+        select_tags=None,
+        truncate=0,
+    ):
+        """Returns a list of discussions by cashout.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_discussions_by_cashout
+
+        Parameters
+        ----------
+        tag : str
+            any valid string
+        limit : int
+            maximum number of results
+        filter_tags : list, None
+            list of valid tags
+        select_authors : list, None
+            list of valid account username
+        select_tags : list, None
+            list of valid tags
+        truncate : int, optional
+            truncate body (0, 1)
+
+        Returns
+        -------
+        list:
+            List of discussions.
+        """
+
+        data = {"tag": tag, "limit": limit, "truncate_body": truncate}
+        _valid_string(tag)
+        _within_range(limit, 1, 500)
+        if not isinstance(filter_tags, list):
+            if filter_tags is not None:
+                raise NektarException("`filter_tags` must be a list.")
+            filter_tags = []
+        if filter_tags:
+            data["filter_tags"] = filter_tags
+        if not isinstance(select_authors, list):
+            if select_authors is not None:
+                raise NektarException("`select_authors` must be a list.")
+            select_authors = []
+        if select_authors:
+            data["select_authors"] = select_authors
+        if not isinstance(select_tags, list):
+            if select_tags is not None:
+                raise NektarException("`select_tags` must be a list.")
+            select_tags = []
+        if select_tags:
+            data["select_tags"] = select_tags
+        if int(truncate) not in (0, 1):
+            raise NektarException("`truncate` must be `0` or `1`.")
+        return self.appbase.condenser().get_discussions_by_cashout([data])
+
+    def get_discussions_by_children(
+        self,
+        tag,
+        limit,
+        filter_tags=None,
+        select_authors=None,
+        select_tags=None,
+        truncate=0,
+    ):
+        """Returns a list of discussions by cashout.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_discussions_by_children
+
+        Parameters
+        ----------
+        tag : str
+            any valid string
+        limit : int
+            maximum number of results
+        filter_tags : list, None
+            list of valid tags
+        select_authors : list, None
+            list of valid account username
+        select_tags : list, None
+            list of valid tags
+        truncate : int, optional
+            truncate body (0, 1)
+
+        Returns
+        -------
+        list:
+            List of discussions.
+        """
+
+        data = {"tag": tag, "limit": limit, "truncate_body": truncate}
+        _valid_string(tag)
+        _within_range(limit, 1, 500)
+        if not isinstance(filter_tags, list):
+            if filter_tags is not None:
+                raise NektarException("`filter_tags` must be a list.")
+            filter_tags = []
+        if filter_tags:
+            data["filter_tags"] = filter_tags
+        if not isinstance(select_authors, list):
+            if select_authors is not None:
+                raise NektarException("`select_authors` must be a list.")
+            select_authors = []
+        if select_authors:
+            data["select_authors"] = select_authors
+        if not isinstance(select_tags, list):
+            if select_tags is not None:
+                raise NektarException("`select_tags` must be a list.")
+            select_tags = []
+        if select_tags:
+            data["select_tags"] = select_tags
+        if int(truncate) not in (0, 1):
+            raise NektarException("`truncate` must be `0` or `1`.")
+        return self.appbase.condenser().get_discussions_by_children([data])
+
+    def get_discussions_by_comments(
+        self,
+        author,
+        permlink,
+        limit,
+    ):
+        """Returns a list of discussions by cashout.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_discussions_by_comments
+
+        Parameters
+        ----------
+        author : str
+            Start string for author name.
+        permlink : str
+            Start string for permlink.
+        limit : int
+
+        Returns
+        -------
+        list:
+            List of discussions.
+        """
+
+        _valid_string(author)
+        # allow empty start permlink
+        _valid_string(permlink)
+        _within_range(limit, 1, 100)
+        data = {"start_author": author, "start_permlink": permlink, "limit": limit}
+        return self.appbase.condenser().get_discussions_by_comments([data])
+
+    def get_discussions_by_created(
+        self,
+        tag,
+        limit,
+        filter_tags=None,
+        select_authors=None,
+        select_tags=None,
+        truncate=0,
+    ):
+        """Returns a list of discussions by created
+        https://developers.hive.io/apidefinitions/#condenser_api.get_discussions_by_created
+
+        Parameters
+        ----------
+        tag : str
+            any valid string
+        limit : int
+            maximum number of results
+        filter_tags : list, None
+            list of valid tags
+        select_authors : list, None
+            list of valid account username
+        select_tags : list, None
+            list of valid tags
+        truncate : int, optional
+            truncate body (0, 1)
+
+        Returns
+        -------
+        list:
+            List of discussions.
+        """
+
+        data = {"tag": tag, "limit": limit, "truncate_body": truncate}
+        _valid_string(tag)
+        _within_range(limit, 1, 500)
+        if not isinstance(filter_tags, list):
+            if filter_tags is not None:
+                raise NektarException("`filter_tags` must be a list.")
+            filter_tags = []
+        if filter_tags:
+            data["filter_tags"] = filter_tags
+        if not isinstance(select_authors, list):
+            if select_authors is not None:
+                raise NektarException("`select_authors` must be a list.")
+            select_authors = []
+        if select_authors:
+            data["select_authors"] = select_authors
+        if not isinstance(select_tags, list):
+            if select_tags is not None:
+                raise NektarException("`select_tags` must be a list.")
+            select_tags = []
+        if select_tags:
+            data["select_tags"] = select_tags
+        if int(truncate) not in (0, 1):
+            raise NektarException("`truncate` must be `0` or `1`.")
+        return self.appbase.condenser().get_discussions_by_created([data])
+
     def find_proposals(self, pid):
         """Finds proposals by proposal id.
         https://developers.hive.io/apidefinitions/#condenser_api.find_proposals
@@ -460,14 +861,15 @@ class Nektar:
         ----------
         pid : int
             proposal.id, not proposal.proposal_id
-            
+
 
         Returns
         -------
         dict:
             A dictionary format of the proposal data.
         """
-        
+
+        _greater_than(pid, 0)
         return self.appbase.condenser().find_proposals([[pid]])
 
     def list_proposal_votes(self, start, limit, order, direction=None, status=None):
@@ -487,39 +889,35 @@ class Nektar:
             `ascending` or `descending`
         status : str, None
             `all`, `inactive`, `active`, `expired`, or `votable`
-            
 
         Returns
         -------
         list:
             A list of proposals votes.
         """
-        
+
         params = [[""], 1000, "by_voter_proposal", "ascending", "all"]
 
         if not isinstance(start, (str, int)):
             raise NektarException("`start` must be a voter acount name or proposal id.")
         params[0][0] = start
-        
-        if not (0 <= int(limit) <= 1000):
-            raise NektarException("`limit` an integer between 0 to 1000.")
-        params[1] = limit
-        
+
+        params[1] = _within_range(limit, 0, 1000)
         if order not in ("by_voter_proposal", "by_proposal_voter"):
             raise NektarException("`order` is not supported.")
         params[2] = order
-        
+
         if direction is not None:
             if direction not in ("ascending", "descending"):
                 raise NektarException("`direction` is not supported.")
             params[3] = direction
-        
+
         if status is not None:
             statuses = ("all", "inactive", "active", "expired", "votable")
             if status not in statuses:
                 raise NektarException("`status` is not supported.")
             params[4] = status
-        
+
         return self.appbase.condenser().list_proposal_votes(params)
 
     def list_proposals(self, start, limit, order, direction=None, status=None):
@@ -550,33 +948,30 @@ class Nektar:
         list:
             A list of proposals votes.
         """
-        
+
         params = [[""], 1000, "by_creator", "ascending", "all"]
 
         if not isinstance(start, (str, int)):
             raise NektarException("`start` must be a voter acount name or proposal id.")
         params[0][0] = start
-        
-        if not (0 <= int(limit) <= 1000):
-            raise NektarException("`limit` an integer between 0 to 1000.")
-        params[1] = limit
-        
+        params[1] = _within_range(limit, 0, 1000)
+
         orders = ("by_creator", "by_start_date", "by_end_date", "by_total_votes")
         if order not in orders:
             raise NektarException("`order` is not supported.")
         params[2] = order
-        
+
         if direction is not None:
             if direction not in ("ascending", "descending"):
                 raise NektarException("`direction` is not supported.")
             params[3] = direction
-        
+
         if status is not None:
             statuses = ("all", "inactive", "active", "expired", "votable")
             if status not in statuses:
                 raise NektarException("`status` is not supported.")
             params[4] = status
-        
+
         return self.appbase.condenser().list_proposals(params)
 
     ##################################################
@@ -590,11 +985,11 @@ class Nektar:
         username :
             a valid Hive account username
         wif :
-            the WIF or private key (default is None)
+            the WIF or private key (Default is None)
         role :
-            the equivalent authority of the WIF (default is None)
+            the equivalent authority of the WIF (Default is None)
         wifs :
-            a dictionary of roles and their equivalent WIFs (default is None)
+            a dictionary of roles and their equivalent WIFs (Default is None)
 
         Returns
         -------
@@ -623,7 +1018,7 @@ class Nektar:
         Parameters
         ----------
         account :
-            a valid Hive account username, default = initizalized account (default is None)
+            a valid Hive account username, default = initizalized account (Default is None)
 
         Returns
         -------
@@ -651,7 +1046,7 @@ class Nektar:
         Parameters
         ----------
         account :
-            a valid Hive account username, default = initizalized account (default is None)
+            a valid Hive account username, default = initizalized account (Default is None)
 
         Returns
         -------
@@ -667,9 +1062,9 @@ class Nektar:
         Parameters
         ----------
         account :
-            a valid Hive account username, default = initizalized account (default is None)
+            a valid Hive account username, default = initizalized account (Default is None)
         score :
-             (default is True)
+             (Default is True)
 
         Returns
         -------
@@ -696,9 +1091,9 @@ class Nektar:
         Parameters
         ----------
         field :
-            configuration field to get (default is None)
+            configuration field to get (Default is None)
         fallback :
-            a fallback value if field is not found (default is None)
+            a fallback value if field is not found (Default is None)
 
         Returns
         -------
@@ -718,7 +1113,7 @@ class Nektar:
         Parameters
         ----------
         api :
-            the API to access the global properties (default is "condenser")
+            the API to access the global properties (Default is "condenser")
 
         Returns
         -------
@@ -772,12 +1167,12 @@ class Nektar:
         ----------
         transaction :
             the formatted transaction based on the API method
-        synchronous :
-            broadcasting     method (default is False)
-        strict :
-            flag to cause exception upon encountering an error (default is True)
-        debug :
-            flag to disable completion of the broadcast operation (default is False)
+        synchronous : bool, optional
+            broadcasting     method (Default is False)
+        strict : bool, optional
+            flag to cause exception upon encountering an error (Default is True)
+        debug : bool, optional
+            flag to disable completion of the broadcast operation (Default is False)
 
         Returns
         -------
@@ -811,17 +1206,17 @@ class Nektar:
         jdata :
             any valid JSON data
         required_auths :
-            list of usernames required to sign with private keys (default is [])
+            list of usernames required to sign with private keys (Default is [])
         required_posting_auths :
-            list of usernames required to sign with a `posting` private key (default is [])
-        expire :
-            transaction expiration in seconds (default is 30)
-        synchronous :
-            flah to broadcasting method synchronously (default is False)
-        strict :
-            flag to cause exception upon encountering an error (default is True)
-        debug :
-            flag to disable completion of the broadcast operation (default is False)
+            list of usernames required to sign with a `posting` private key (Default is [])
+        expire : int, optional
+            transaction expiration in seconds (Default is 30)
+        synchronous : bool, optional
+            flah to broadcasting method synchronously (Default is False)
+        strict : bool, optional
+            flag to cause exception upon encountering an error (Default is True)
+        debug : bool, optional
+            flag to disable completion of the broadcast operation (Default is False)
 
         Returns
         -------
@@ -866,7 +1261,7 @@ class Nektar:
         ref_block_num, ref_block_prefix = self.get_reference_block_data()
         expire = _within_range(expire, 5, 120, 30)
         expiration = _make_expiration(expire)
-        synchronous = _true_or_false(synchronous, False)
+        synchronous = _is_boolean(synchronous, False)
 
         operations = [["custom_json", data]]
         transaction = {
@@ -901,17 +1296,17 @@ class Nektar:
         asset :
             asset type to send, `HBD` or `HIVE` only
         message :
-            any UTF-8 string up to 2048 bytes only (default is "")
+            any UTF-8 string up to 2048 bytes only (Default is "")
         to :
             transfer to `None`, `savings`, or `vesting` (Default = None)
-        expire :
-            transaction expiration in seconds (default is 30)
-        synchronous :
-            flah to broadcasting method synchronously (default is False)
-        strict :
-            flag to cause exception upon encountering an error (default is True)
-        debug :
-            flag to disable completion of the broadcast operation (default is False)
+        expire : int, optional
+            transaction expiration in seconds (Default is 30)
+        synchronous : bool, optional
+            flah to broadcasting method synchronously (Default is False)
+        strict : bool, optional
+            flag to cause exception upon encountering an error (Default is True)
+        debug : bool, optional
+            flag to disable completion of the broadcast operation (Default is False)
 
         Returns
         -------
@@ -963,9 +1358,9 @@ class Nektar:
         ref_block_num, ref_block_prefix = self.get_reference_block_data()
         expire = _within_range(expire, 5, 120, 30)
         expiration = _make_expiration(expire)
-        synchronous = _true_or_false(synchronous, False)
-        strict = _true_or_false(strict, True)
-        debug = _true_or_false(debug, False)
+        synchronous = _is_boolean(synchronous, False)
+        strict = _is_boolean(strict, True)
+        debug = _is_boolean(debug, False)
 
         transaction = {
             "ref_block_num": ref_block_num,
@@ -999,15 +1394,15 @@ class Nektar:
         asset :
             asset type to send, `HBD` or `HIVE` only
         message :
-            any UTF-8 string up to 2048 bytes only (default is "")
-        expire :
-            transaction expiration in seconds (default is 30)
-        synchronous :
-            flah to broadcasting method synchronously (default is False)
-        strict :
-            flag to cause exception upon encountering an error (default is True)
-        debug :
-            flag to disable completion of the broadcast operation (default is False)
+            any UTF-8 string up to 2048 bytes only (Default is "")
+        expire : int, optional
+            transaction expiration in seconds (Default is 30)
+        synchronous : bool, optional
+            flah to broadcasting method synchronously (Default is False)
+        strict : bool, optional
+            flag to cause exception upon encountering an error (Default is True)
+        debug : bool, optional
+            flag to disable completion of the broadcast operation (Default is False)
 
         Returns
         -------
@@ -1045,14 +1440,14 @@ class Nektar:
             any positive value
         message :
             any UTF-8 string up to 2048 bytes only
-        expire :
-            transaction expiration in seconds (default is 30)
-        synchronous :
-            flah to broadcasting method synchronously (default is False)
-        strict :
-            flag to cause exception upon encountering an error (default is True)
-        debug :
-            flag to disable completion of the broadcast operation (default is False)
+        expire : int, optional
+            transaction expiration in seconds (Default is 30)
+        synchronous : bool, optional
+            flah to broadcasting method synchronously (Default is False)
+        strict : bool, optional
+            flag to cause exception upon encountering an error (Default is True)
+        debug : bool, optional
+            flag to disable completion of the broadcast operation (Default is False)
 
         Returns
         -------
@@ -1081,21 +1476,21 @@ class Waggle(Nektar):
     username :
         a valid Hive account username
     wif :
-        the WIF or private key (default is None)
+        the WIF or private key (Default is None)
     role :
-        the equivalent authority of the WIF (default is None)
+        the equivalent authority of the WIF (Default is None)
     wifs :
-        a dictionary of roles and their equivalent WIFs (default is None)
+        a dictionary of roles and their equivalent WIFs (Default is None)
     app :
-        the name of the app built with nektar (default is None)
+        the name of the app built with nektar (Default is None)
     version :
-        the version `x.y.x` of the app built with nektar (default is None)
+        the version `x.y.x` of the app built with nektar (Default is None)
     timeout :
-        seconds before the request is dropped (default is 10)
+        seconds before the request is dropped (Default is 10)
     retries :
-        times the request retries if errors are encountered (default is 3)
+        times the request retries if errors are encountered (Default is 3)
     warning :
-        display warning messages (default is False)
+        display warning messages (Default is False)
 
     Returns
     -------
@@ -1148,13 +1543,13 @@ class Waggle(Nektar):
         Parameters
         ----------
         last :
-            last known community name `hive-*`, paging mechanism (default is None)
+            last known community name `hive-*`, paging mechanism (Default is None)
         sort :
-            maximum limit of communities to list (default is "rank")
+            maximum limit of communities to list (Default is "rank")
         limit :
-            sort by `rank`, `new`, or `subs` (default is 100)
+            sort by `rank`, `new`, or `subs` (Default is 100)
         query :
-            additional filter keywords for search (default is None)
+            additional filter keywords for search (Default is None)
 
         Returns
         -------
@@ -1200,9 +1595,9 @@ class Waggle(Nektar):
         community :
             community name `hive-*`
         last :
-            last known subscriber username, paging mechanism (default is None)
+            last known subscriber username, paging mechanism (Default is None)
         limit :
-            maximum limit of subscribers to list (default is 100)
+            maximum limit of subscribers to list (Default is 100)
 
         Returns
         -------
@@ -1248,9 +1643,9 @@ class Waggle(Nektar):
         Parameters
         ----------
         start :
-            starting part of username to search (default is None)
+            starting part of username to search (Default is None)
         limit :
-            maximum limit of accounts to list (default is 100)
+            maximum limit of accounts to list (Default is 100)
 
         Returns
         -------
@@ -1293,13 +1688,13 @@ class Waggle(Nektar):
         Parameters
         ----------
         account :
-            a valid Hive account username, default = username (default is None)
+            a valid Hive account username, default = username (Default is None)
         start :
-            account to start from, paging mechanism (default is None)
+            account to start from, paging mechanism (Default is None)
         ignore :
-            show all muted accounts if True (default is False)
+            show all muted accounts if True (Default is False)
         limit :
-            maximum limit of accounts to list (default is 1000)
+            maximum limit of accounts to list (Default is 1000)
 
         Returns
         -------
@@ -1346,15 +1741,15 @@ class Waggle(Nektar):
         Parameters
         ----------
         account :
-            any valid Hive account username, default = initialized username (default is None)
+            any valid Hive account username, default = initialized username (Default is None)
         start :
-            starting range, or -1 for reverse history (default is -1)
+            starting range, or -1 for reverse history (Default is -1)
         limit :
-            upperbound limit 1-1000 (default is 1000)
+            upperbound limit 1-1000 (Default is 1000)
         low :
-            operation id (default is None)
+            operation id (Default is None)
         high :
-            operation id (default is None)
+            operation id (Default is None)
 
         Returns
         -------
@@ -1373,13 +1768,13 @@ class Waggle(Nektar):
         Parameters
         ----------
         account :
-            any valid Hive account username, default = initialized username (default is None)
+            any valid Hive account username, default = initialized username (Default is None)
         active :
-            include all changes in delegations if false (default is False)
+            include all changes in delegations if false (Default is False)
         start :
-            initial starting transaction (default is 1000)
+            initial starting transaction (Default is 1000)
         inward :
-            inward delegations to the specified account (default is True)
+            inward delegations to the specified account (Default is True)
 
         Returns
         -------
@@ -1447,11 +1842,11 @@ class Waggle(Nektar):
         Parameters
         ----------
         account :
-            any valid Hive account username, default = initialized username (default is None)
+            any valid Hive account username, default = initialized username (Default is None)
         active :
-            include all changes in delegations if false (default is False)
+            include all changes in delegations if false (Default is False)
         start :
-            initial starting transaction (default is -1)
+            initial starting transaction (Default is -1)
 
         Returns
         -------
@@ -1466,11 +1861,11 @@ class Waggle(Nektar):
         Parameters
         ----------
         account :
-            any valid Hive account username, default = initialized username (default is None)
+            any valid Hive account username, default = initialized username (Default is None)
         active :
-            include all changes in delegations if false (default is False)
+            include all changes in delegations if false (Default is False)
         start :
-            initial starting transaction (default is -1)
+            initial starting transaction (Default is -1)
 
         Returns
         -------
@@ -1487,13 +1882,13 @@ class Waggle(Nektar):
         Parameters
         ----------
         tag :
-            any valid tags (default is None)
+            any valid tags (Default is None)
         sort :
-            sort by `created`, `trending`, `hot`, `promoted`, `payout`, `payout_comments`, or `muted` (default is "created")
+            sort by `created`, `trending`, `hot`, `promoted`, `payout`, `payout_comments`, or `muted` (Default is "created")
         paidout :
-            return new (False), paidout (True), all (None) (default is None)
+            return new (False), paidout (True), all (None) (Default is None)
         limit :
-            maximum limit of blogs (default is 100)
+            maximum limit of blogs (Default is 100)
 
         Returns
         -------
@@ -1536,13 +1931,13 @@ class Waggle(Nektar):
         Parameters
         ----------
         account :
-            any valid account, default = set username (default is None)
+            any valid account, default = set username (Default is None)
         sort :
-            sort by `blog`, `feed`, `post`, `replies`, or `payout` (default is "posts")
+            sort by `blog`, `feed`, `post`, `replies`, or `payout` (Default is "posts")
         paidout :
-            filter for all or paid out posts (default is None)
+            filter for all or paid out posts (Default is None)
         limit :
-            maximum limit of posts (default is 20)
+            maximum limit of posts (Default is 20)
 
         Returns
         -------
@@ -1582,7 +1977,7 @@ class Waggle(Nektar):
         permlink :
             permlink to the blog post being accessed
         retries :
-            number of times to check the existence of the post, must be between 1-5 (default is 1)
+            number of times to check the existence of the post, must be between 1-5 (Default is 1)
 
         Returns
         -------
@@ -1622,7 +2017,7 @@ class Waggle(Nektar):
         permlink :
             permlink to the blog post being accessed
         retries :
-            number of times to check the existence of the post, must be between 1-5 (default is 1)
+            number of times to check the existence of the post, must be between 1-5 (Default is 1)
 
         Returns
         -------
@@ -1672,19 +2067,19 @@ class Waggle(Nektar):
         body :
             body of the post being submitted
         description :
-            default is None)
+            Default is None)
         tags :
-            a space separated list of tags (default is None)
+            a space separated list of tags (Default is None)
         community :
-            the community to post e.g. `hive-*` (default is None)
-        expire :
-            transaction expiration in seconds (default is 30)
-        synchronous :
-            flah to broadcasting method synchronously (default is False)
-        strict :
-            flag to cause exception upon encountering an error (default is True)
-        debug :
-            flag to disable completion of the broadcast operation (default is False)
+            the community to post e.g. `hive-*` (Default is None)
+        expire : int, optional
+            transaction expiration in seconds (Default is 30)
+        synchronous : bool, optional
+            flah to broadcasting method synchronously (Default is False)
+        strict : bool, optional
+            flag to cause exception upon encountering an error (Default is True)
+        debug : bool, optional
+            flag to disable completion of the broadcast operation (Default is False)
 
         Returns
         -------
@@ -1746,9 +2141,9 @@ class Waggle(Nektar):
         ref_block_num, ref_block_prefix = self.get_reference_block_data()
         expiration = _make_expiration(expire)
         expire = _within_range(expire, 5, 120, 30)
-        synchronous = _true_or_false(synchronous, False)
-        strict = _true_or_false(strict, True)
-        debug = _true_or_false(debug, False)
+        synchronous = _is_boolean(synchronous, False)
+        strict = _is_boolean(strict, True)
+        debug = _is_boolean(debug, False)
 
         operations = [["comment", data]]
         transaction = {
@@ -1777,14 +2172,14 @@ class Waggle(Nektar):
             username of author of the blog post  to reblog
         permlink :
             permlink to the blog post to reblog
-        expire :
-            transaction expiration in seconds (default is 30)
-        synchronous :
-            flah to broadcasting method synchronously (default is False)
-        strict :
-            flag to cause exception upon encountering an error (default is True)
-        debug :
-            flag to disable completion of the broadcast operation (default is False)
+        expire : int, optional
+            transaction expiration in seconds (Default is 30)
+        synchronous : bool, optional
+            flah to broadcasting method synchronously (Default is False)
+        strict : bool, optional
+            flag to cause exception upon encountering an error (Default is True)
+        debug : bool, optional
+            flag to disable completion of the broadcast operation (Default is False)
 
         Returns
         -------
@@ -1796,7 +2191,10 @@ class Waggle(Nektar):
                 "The `follow` operation requires"
                 "one of the following private keys:" + ", ".join(ROLES["follow"])
             )
-        jdata = ["reblog", {"account": self.username, "author": author, "permlink": permlink}]
+        jdata = [
+            "reblog",
+            {"account": self.username, "author": author, "permlink": permlink},
+        ]
         return self.custom_json(
             "follow",
             jdata,
@@ -1829,15 +2227,15 @@ class Waggle(Nektar):
         body :
             the content of the comment
         edit :
-            edit existing comment on post (default is True)
-        expire :
-            transaction expiration in seconds (default is 30)
-        synchronous :
-            flah to broadcasting method synchronously (default is False)
-        strict :
-            flag to cause exception upon encountering an error (default is True)
-        debug :
-            flag to disable completion of the broadcast operation (default is False)
+            edit existing comment on post (Default is True)
+        expire : int, optional
+            transaction expiration in seconds (Default is 30)
+        synchronous : bool, optional
+            flah to broadcasting method synchronously (Default is False)
+        strict : bool, optional
+            flag to cause exception upon encountering an error (Default is True)
+        debug : bool, optional
+            flag to disable completion of the broadcast operation (Default is False)
 
         Returns
         -------
@@ -1864,7 +2262,7 @@ class Waggle(Nektar):
         data["body"] = body
 
         uid = ""
-        edit = _true_or_false(edit, True)
+        edit = _is_boolean(edit, True)
         if not edit:
             uid = _make_expiration(formatting="-%Y%m%d%H%M%S")
         data["permlink"] = ("re-" + permlink + uid)[:255]
@@ -1884,9 +2282,9 @@ class Waggle(Nektar):
         ref_block_num, ref_block_prefix = self.get_reference_block_data()
         expiration = _make_expiration(expire)
         expire = _within_range(expire, 5, 120, 30)
-        synchronous = _true_or_false(synchronous, False)
-        strict = _true_or_false(strict, True)
-        debug = _true_or_false(debug, False)
+        synchronous = _is_boolean(synchronous, False)
+        strict = _is_boolean(strict, True)
+        debug = _is_boolean(debug, False)
 
         operations = [["comment", data]]
         transaction = {
@@ -1908,7 +2306,7 @@ class Waggle(Nektar):
         permlink :
             permlink to the blog post being accessed
         retries :
-            number of times to check the existence of the post, must be between 1-5 (default is 1)
+            number of times to check the existence of the post, must be between 1-5 (Default is 1)
 
         Returns
         -------
@@ -1947,7 +2345,7 @@ class Waggle(Nektar):
         permlink :
             permlink to the blog post being accessed
         retries :
-            number of times to check the existence of the post, must be between 1-5 (default is 1)
+            number of times to check the existence of the post, must be between 1-5 (Default is 1)
 
         Returns
         -------
@@ -1993,23 +2391,23 @@ class Waggle(Nektar):
         Parameters
         ----------
         author :
-            author of the post or comment being voted
+            Author of the post. or comment being voted
         permlink :
-            permlink of the post or comment being voted
+            Permlink of the post or comment being voted
         weight :
-            vote weight between -10000 to 10000 (default is 10000)
+            vote weight between -10000 to 10000 (Default is 10000)
         percent :
-            override vote weight with percentage (default is None)
+            override vote weight with percentage (Default is None)
         check :
-            check if account had already voted on the post (default is False)
-        expire :
-            transaction expiration in seconds (default is 30)
-        synchronous :
-            flah to broadcasting method synchronously (default is False)
-        strict :
-            flag to cause exception upon encountering an error (default is True)
-        debug :
-            flag to disable completion of the broadcast operation (default is False)
+            check if account had already voted on the post (Default is False)
+        expire : int, optional
+            transaction expiration in seconds (Default is 30)
+        synchronous : bool, optional
+            flah to broadcasting method synchronously (Default is False)
+        strict : bool, optional
+            flag to cause exception upon encountering an error (Default is True)
+        debug : bool, optional
+            flag to disable completion of the broadcast operation (Default is False)
 
         Returns
         -------
@@ -2035,7 +2433,7 @@ class Waggle(Nektar):
         if not len(match):
             raise NektarException("permlink must be a valid url-escaped string.")
 
-        if _true_or_false(check, False):
+        if _is_boolean(check, False):
             if self.voted(author, permlink):
                 return {}
 
@@ -2047,9 +2445,9 @@ class Waggle(Nektar):
         weight = _within_range(weight, -10000, 10000, 10000)
         expire = _within_range(expire, 5, 120, 30)
         expiration = _make_expiration(expire)
-        synchronous = _true_or_false(synchronous, False)
-        strict = _true_or_false(strict, True)
-        debug = _true_or_false(debug, False)
+        synchronous = _is_boolean(synchronous, False)
+        strict = _is_boolean(strict, True)
+        debug = _is_boolean(debug, False)
 
         operations = [
             [
@@ -2081,7 +2479,7 @@ class Waggle(Nektar):
         permlink :
             permlink to the blog post being accessed
         retries :
-            number of times to check the existence of the post, must be between 1-5 (default is 1)
+            number of times to check the existence of the post, must be between 1-5 (Default is 1)
 
         Returns
         -------
@@ -2118,17 +2516,17 @@ class Waggle(Nektar):
         Parameters
         ----------
         author :
-            
+
         permlink :
-            
-        expire :
-             (default is 30)
-        synchronous :
-             (default is False)
-        strict :
-             (default is True)
-        debug :
-             (default is False)
+
+        expire : int, optional
+             (Default is 30)
+        synchronous : bool, optional
+             (Default is False)
+        strict : bool, optional
+             (Default is True)
+        debug : bool, optional
+             (Default is False)
 
         Returns
         -------
@@ -2152,18 +2550,18 @@ class Waggle(Nektar):
 
         Parameters
         ----------
-        receiver :
-            
-        amount :
-            
-        expire :
-             (default is 30)
-        synchronous :
-             (default is False)
-        strict :
-             (default is True)
-        debug :
-             (default is False)
+        receiver : str
+
+        amount : optional
+
+        expire : int, optional
+             (Default is 30)
+        synchronous : bool, optional
+             (Default is False)
+        strict : bool, optional
+             (Default is True)
+        debug : bool, optional
+             (Default is False)
 
         Returns
         -------
@@ -2186,29 +2584,26 @@ class Swarm(Nektar):
 
     Parameters
     ----------
-    community :
+    community : str
         a valid Hive community name `hive-*`
-    username :
+    username : str
         a valid Hive account username
-    wif :
-        the WIF or private key (default is None)
-    role :
-        the equivalent authority of the WIF (default is None)
-    wifs :
-        a dictionary of roles and their equivalent WIFs (default is None)
-    app :
-        the name of the app built with nektar (default is None)
-    version :
-        the version `x.y.x` of the app built with nektar (default is None)
-    timeout :
-        seconds before the request is dropped (default is 10)
-    retries :
-        times the request retries if errors are encountered (default is 3)
-    warning :
-        display warning messages (default is False)
-
-    Returns
-    -------
+    wif : str, optional
+        the WIF or private key (Default is None)
+    role : str, optional
+        the equivalent authority of the WIF (Default is None)
+    wifs : dict, optional
+        a dictionary of roles and their equivalent WIFs (Default is None)
+    app : str, optional
+        the name of the app built with nektar (Default is None)
+    version : str, optional
+        the version `x.y.x` of the app built with nektar (Default is None)
+    timeout : int, optional
+        seconds before the request is dropped (Default is 10)
+    retries : int, optional
+        times the request retries if errors are encountered (Default is 3)
+    warning : boo, optional
+        display warning messages (Default is False)
 
     """
 
@@ -2248,11 +2643,7 @@ class Swarm(Nektar):
             self.version = version
 
         self._community = community
-        if not len(re.findall(r"\bhive-[\d]{1,6}\b", community)):
-            raise NektarException(
-                "Community must be a valid community name in `hive-*` format."
-            )
-
+        _valid_string(community, RE_COMMUNITY)
         self._required_posting_auths = [self.username]
 
     def mute(
@@ -2277,34 +2668,27 @@ class Swarm(Nektar):
         notes :
             reason for muting
         mute :
-            mute author (default is True)
-        expire :
-            transaction expiration in seconds (default is 30)
-        synchronous :
-            flah to broadcasting method synchronously (default is False)
-        strict :
-            flag to cause exception upon encountering an error (default is True)
-        debug :
-            flag to disable completion of the broadcast operation (default is False)
+            mute author (Default is True)
+        expire : int, optional
+            transaction expiration in seconds (Default is 30)
+        synchronous : bool, optional
+            flah to broadcasting method synchronously (Default is False)
+        strict : bool, optional
+            flag to cause exception upon encountering an error (Default is True)
+        debug : bool, optional
+            flag to disable completion of the broadcast operation (Default is False)
 
         Returns
         -------
 
         """
 
-        if not isinstance(author, str):
-            raise NektarException("Username must be a valid Hive account username.")
-
-        pattern = r"[\w][\w\d\-\%]{0,255}"
-        if not len(re.findall(pattern, permlink)):
-            raise NektarException("The permlink must be a valid url-escaped string.")
-
-        if not isinstance(notes, str):
-            raise NektarException("Notes must be in string format.")
+        _valid_string(author)
+        _valid_string(permlink, RE_PERMLINK)
+        _valid_string(notes)
 
         operation = ["mutePost", {}]
-        if not isinstance(mute, bool):
-            raise NektarException("`mute` must be either `True` or `False` only.")
+        _is_boolean(mute)
         if not mute:
             operation[0] = "unmutePost"
         operation[1] = {
@@ -2345,14 +2729,14 @@ class Swarm(Nektar):
             permlink to the blog post
         notes :
             reason for unmuting
-        expire :
-            transaction expiration in seconds (default is 30)
-        synchronous :
-            flah to broadcasting method synchronously (default is False)
-        strict :
-            flag to cause exception upon encountering an error (default is True)
-        debug :
-            flag to disable completion of the broadcast operation (default is False)
+        expire : int, optional
+            transaction expiration in seconds (Default is 30)
+        synchronous : bool, optional
+            flah to broadcasting method synchronously (Default is False)
+        strict : bool, optional
+            flag to cause exception upon encountering an error (Default is True)
+        debug : bool, optional
+            flag to disable completion of the broadcast operation (Default is False)
 
         Returns
         -------
@@ -2377,14 +2761,14 @@ class Swarm(Nektar):
             a valid blockchain account username
         permlink :
             actual permlink to the specified author
-        expire :
-            transaction expiration in seconds (default is 30)
-        synchronous :
-            flah to broadcasting method synchronously (default is False)
-        strict :
-            flag to cause exception upon encountering an error (default is True)
-        debug :
-            flag to disable completion of the broadcast operation (default is False)
+        expire : int, optional
+            transaction expiration in seconds (Default is 30)
+        synchronous : bool, optional
+            flah to broadcasting method synchronously (Default is False)
+        strict : bool, optional
+            flag to cause exception upon encountering an error (Default is True)
+        debug : bool, optional
+            flag to disable completion of the broadcast operation (Default is False)
 
         Returns
         -------
@@ -2415,17 +2799,17 @@ class Swarm(Nektar):
         is_nsfw :
             not suitable or safe for work
         description :
-            mute author (default is True)
+            mute author (Default is True)
         flag_text :
-            mute author (default is True)
-        expire :
-            transaction expiration in seconds (default is 30)
-        synchronous :
-            flah to broadcasting method synchronously (default is False)
-        strict :
-            flag to cause exception upon encountering an error (default is True)
-        debug :
-            flag to disable completion of the broadcast operation (default is False)
+            mute author (Default is True)
+        expire : int, optional
+            transaction expiration in seconds (Default is 30)
+        synchronous : bool, optional
+            flah to broadcasting method synchronously (Default is False)
+        strict : bool, optional
+            flag to cause exception upon encountering an error (Default is True)
+        debug : bool, optional
+            flag to disable completion of the broadcast operation (Default is False)
 
         Returns
         -------
@@ -2489,30 +2873,26 @@ class Swarm(Nektar):
 
         Parameters
         ----------
-        mute :
-            subscribe to the community (default is True)
-        expire :
-            transaction expiration in seconds (default is 30)
-        synchronous :
-            flah to broadcasting method synchronously (default is False)
-        strict :
-            flag to cause exception upon encountering an error (default is True)
-        debug :
-            flag to disable completion of the broadcast operation (default is False)
-        subscribe :
-             (default is True)
+        subscribe : bool, optional
+            Subscribe to the community (Default is True)
+        expire : int, optional
+            transaction expiration in seconds (Default is 30)
+        synchronous : bool, optional
+            flah to broadcasting method synchronously (Default is False)
+        strict : bool, optional
+            flag to cause exception upon encountering an error (Default is True)
+        debug : bool, optional
+            flag to disable completion of the broadcast operation (Default is False)
 
         Returns
         -------
 
         """
 
-        operation = ["subscribe", {}]
-        if not isinstance(subscribe, bool):
-            raise NektarException("`subscribe` must be either `True` or `False` only.")
+        operation = ["subscribe", {"community": self._community}]
+        _is_boolean(subscribe)
         if not subscribe:
             operation[0] = "unsubscribe"
-        operation[1] = {"community": self._community}
 
         return self.custom_json(
             id_="community",
@@ -2530,14 +2910,14 @@ class Swarm(Nektar):
 
         Parameters
         ----------
-        expire :
-            transaction expiration in seconds (default is 30)
-        synchronous :
-            flah to broadcasting method synchronously (default is False)
-        strict :
-            flag to cause exception upon encountering an error (default is True)
-        debug :
-            flag to disable completion of the broadcast operation (default is False)
+        expire : int, optional
+            transaction expiration in seconds (Default is 30)
+        synchronous : bool, optional
+            flah to broadcasting method synchronously (Default is False)
+        strict : bool, optional
+            flag to cause exception upon encountering an error (Default is True)
+        debug : bool, optional
+            flag to disable completion of the broadcast operation (Default is False)
 
         Returns
         -------
@@ -2564,32 +2944,26 @@ class Swarm(Nektar):
             username of author of the blog post
         permlink :
             permlink to the blog post
-        expire :
-            transaction expiration in seconds (default is 30)
-        synchronous :
-            flah to broadcasting method synchronously (default is False)
-        strict :
-            flag to cause exception upon encountering an error (default is True)
-        debug :
-            flag to disable completion of the broadcast operation (default is False)
+        expire : int, optional
+            transaction expiration in seconds (Default is 30)
+        synchronous : bool, optional
+            flah to broadcasting method synchronously (Default is False)
+        strict : bool, optional
+            flag to cause exception upon encountering an error (Default is True)
+        debug : bool, optional
+            flag to disable completion of the broadcast operation (Default is False)
         pin :
-             (default is True)
+             (Default is True)
 
         Returns
         -------
 
         """
 
-        if not isinstance(author, str):
-            raise NektarException("Username must be a valid Hive account username.")
-
-        pattern = r"[\w][\w\d\-\%]{0,255}"
-        if not len(re.findall(pattern, permlink)):
-            raise NektarException("The permlink must be a valid url-escaped string.")
-
+        _valid_string(author)
+        _valid_string(permlink, RE_PERMLINK)
+        _is_boolean(pin)
         action = "pinPost"
-        if not isinstance(pin, bool):
-            raise NektarException("`pin` must be either `True` or `False` only.")
         if not pin:
             action = "unpinPost"
 
@@ -2627,14 +3001,14 @@ class Swarm(Nektar):
             username of author of the blog post
         permlink :
             permlink to the blog post
-        expire :
-            transaction expiration in seconds (default is 30)
-        synchronous :
-            flah to broadcasting method synchronously (default is False)
-        strict :
-            flag to cause exception upon encountering an error (default is True)
-        debug :
-            flag to disable completion of the broadcast operation (default is False)
+        expire : int, optional
+            transaction expiration in seconds (Default is 30)
+        synchronous : bool, optional
+            flah to broadcasting method synchronously (Default is False)
+        strict : bool, optional
+            flag to cause exception upon encountering an error (Default is True)
+        debug : bool, optional
+            flag to disable completion of the broadcast operation (Default is False)
 
         Returns
         -------
@@ -2663,29 +3037,23 @@ class Swarm(Nektar):
             permlink to the blog post
         notes :
             reason for muting
-        expire :
-            transaction expiration in seconds (default is 30)
-        synchronous :
-            flah to broadcasting method synchronously (default is False)
-        strict :
-            flag to cause exception upon encountering an error (default is True)
-        debug :
-            flag to disable completion of the broadcast operation (default is False)
+        expire : int, optional
+            transaction expiration in seconds (Default is 30)
+        synchronous : bool, optional
+            flah to broadcasting method synchronously (Default is False)
+        strict : bool, optional
+            flag to cause exception upon encountering an error (Default is True)
+        debug : bool, optional
+            flag to disable completion of the broadcast operation (Default is False)
 
         Returns
         -------
 
         """
 
-        if not isinstance(author, str):
-            raise NektarException("Username must be a valid Hive account username.")
-
-        pattern = r"[\w][\w\d\-\%]{0,255}"
-        if not len(re.findall(pattern, permlink)):
-            raise NektarException("The permlink must be a valid url-escaped string.")
-
-        if not isinstance(notes, str):
-            raise NektarException("Notes must be in string format.")
+        _valid_string(author)
+        _valid_string(permlink, RE_PERMLINK)
+        _valid_string(notes)
 
         data = {}
         data["community"] = self._community
@@ -2716,38 +3084,88 @@ def _check_wifs(roles, operation):
 
     Parameters
     ----------
-    roles :
-        param operation:
-    operation :
-        
+    roles : list
+        list of key authority
+    operation : str
+        operation name
 
     Returns
     -------
-
+        Boolean value.
     """
-    return len([role for role in ROLES[operation] if role in roles])
+    return bool(len([r for r in ROLES[operation] if r in roles]))
 
 
-def _make_expiration(secs=30, formatting=None):
+def _make_expiration(seconds=30, formatting=None):
     """Return a UTC datetime formatted for the blockchain.
 
     Parameters
     ----------
-    secs :
-        default is 30)
-    formatting :
-         (default is None)
+    seconds : int
+        seconds to add to the current timestamp (Default is 30)
+    formatting : str, None
+        format of the date-time string
 
     Returns
     -------
-
+    str:
+        Formatted date and time string.
     """
-    timestamp = time.time() + int(secs)
+    timestamp = time.time() + int(seconds)
     if formatting is None:
         formatting = DATETIME_FORMAT
-    if not isinstance(formatting, str):
-        raise NektarException("Formatting must be in string format.")
+    _valid_string(formatting)
     return datetime.utcfromtimestamp(timestamp).strftime(formatting)
+
+def _valid_string(value, pattern=None, fallback=None):
+    """Check if the value is a valid string.
+
+    Parameters
+    ----------
+    value : str
+        value to be tested
+    pattern : str
+        regex pattern
+    fallback : str, None
+        value if failing
+
+    Returns
+    -------
+    str:
+        The value or the fallback.
+    """
+    if not isinstance(value, str):
+        if fallback is None:
+            raise NektarException("The value must be a string.")
+        return fallback
+    if pattern is None:
+        return value
+    if not bool(len(re.findall(pattern, value))):
+        raise NektarException("The value is unsupported.")
+    return value
+
+def _greater_than(value, minimum, fallback=None):
+    """Check if input is greater than, otherwise return fallback.
+
+    Parameters
+    ----------
+    value :
+        value to be tested
+    minimum :
+        value to be tested against
+    fallback :
+        Default is None
+
+    Returns
+    -------
+        The value or the fallback.
+
+    """
+    if not (isinstance(value, int) or rid > minimum):
+        if fallback is None:
+            raise NektarException(f"Value must be an integer greater than {minimum}.")
+        return fallback
+    return value
 
 
 def _within_range(value, minimum, maximum, fallback=None):
@@ -2761,36 +3179,36 @@ def _within_range(value, minimum, maximum, fallback=None):
         minimum value of the range
     maximum :
         maximum value of the range
-    fallback :
-        default is None)
+    fallback : integer, None
+        fallback value
 
     Returns
     -------
 
     """
-    if not (minimum <= int(value) <= maximum):
-        if fallback is not None:
+    if not (isinstance(value, int) and (minimum <= int(value) <= maximum)):
+        if fallback is None:
             raise NektarException(f"Value must be within {minimum} to {maximum} only.")
         return fallback
     return value
 
-
-def _true_or_false(value, fallback=None):
+def _is_boolean(value, fallback=None):
     """Check if input is boolean, otherwise return fallback.
 
     Parameters
     ----------
     value :
         value to be tested
-    fallback :
-        default value if failing
+    fallback : bool, None
+        fallback value
 
     Returns
     -------
+        The value or the fallback.
 
     """
     if not isinstance(value, bool):
-        if fallback is not None:
-            raise NektarException(f"Value must be within `True` or `False` only.")
+        if fallback is None:
+            raise NektarException("The value must be `True` or `False` only.")
         return fallback
     return value

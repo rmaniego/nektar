@@ -358,3 +358,7 @@ NODES = [
     "hive-api.arcange.eu",
     # "api.pharesim.me",
 ]
+
+RE_PERMLINK = r"[\w][\w\d\-\%]{0,255}"
+RE_COMMUNITY = r"\bhive-[\d]{1,6}\b"
+RE_DATETIME = r"\d{4}\-\d{2}\-\d{2}T\d{2}:\d{2}:\d{2}"
