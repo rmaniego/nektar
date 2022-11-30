@@ -21,6 +21,7 @@ from .appbase import AppBase
 from .constants import (
     NEKTAR_VERSION,
     BLOCKCHAIN_OPERATIONS,
+    DISCUSSIONS_BY,
     ASSETS,
     ROLES,
     DATETIME_FORMAT,
@@ -504,6 +505,92 @@ class Nektar:
         """
 
         return self.appbase.condenser().get_current_median_history_price([])
+    
+    def get_discussions(
+        self,
+        by,
+        tag,
+        limit,
+        filter_tags=None,
+        select_authors=None,
+        select_tags=None,
+        truncate=0,
+    ):
+        """Returns a list of discussions.
+
+        Parameters
+        ----------
+        by : str
+            `promoted`
+        tag : str
+            any valid string
+        limit : int
+            maximum number of results
+        filter_tags : list, None
+            list of valid tags
+        select_authors : list, None
+            list of valid account username
+        select_tags : list, None
+            list of valid tags
+        truncate : int, optional
+            truncate body (0, 1)
+
+        Returns
+        -------
+        list:
+            List of discussions.
+        """
+        
+        _valid_string(by)
+        if by not in DISCUSSIONS_BY:
+            raise NektarException("`by` must be a value in:", ",".join(DISCUSSIONS_BY))
+        
+        _valid_string(tag)
+        _within_range(limit, 1, 500)
+        _within_range(truncate, 0, 1)
+        
+        # initial parameters
+        data = {"tag": tag, "limit": limit, "truncate_body": truncate}
+        
+        # custom filters
+        if not isinstance(filter_tags, list):
+            if filter_tags is not None:
+                raise NektarException("`filter_tags` must be a list.")
+            filter_tags = []
+        if filter_tags:
+            data["filter_tags"] = filter_tags
+        if not isinstance(select_authors, list):
+            if select_authors is not None:
+                raise NektarException("`select_authors` must be a list.")
+            select_authors = []
+        if select_authors:
+            data["select_authors"] = select_authors
+        if not isinstance(select_tags, list):
+            if select_tags is not None:
+                raise NektarException("`select_tags` must be a list.")
+            select_tags = []
+        if select_tags:
+            data["select_tags"] = select_tags
+
+        match by:
+            case "active":
+                return self.appbase.condenser().get_discussions_by_active([data])
+            case "blog":
+                return self.appbase.condenser().get_discussions_by_blog([data])
+            case "cashout":
+                return self.appbase.condenser().get_discussions_by_cashout([data])
+            case "children":
+                return self.appbase.condenser().get_discussions_by_children([data])
+            case "created":
+                return self.appbase.condenser().get_discussions_by_created([data])
+            case "hot":
+                return self.appbase.condenser().get_discussions_by_hot([data])
+            case "promoted":
+                return self.appbase.condenser().get_discussions_by_promoted([data])
+            case "trending":
+                return self.appbase.condenser().get_discussions_by_trending([data])
+            case "votes":
+                return self.appbase.condenser().get_discussions_by_trending([data])
 
     def get_discussions_by_active(
         self,
@@ -537,59 +624,16 @@ class Nektar:
         list:
             List of discussions.
         """
-
-        data = {"tag": tag, "limit": limit, "truncate_body": truncate}
-        _valid_string(tag)
-        _within_range(limit, 1, 500)
-        if not isinstance(filter_tags, list):
-            if filter_tags is not None:
-                raise NektarException("`filter_tags` must be a list.")
-            filter_tags = []
-        if filter_tags:
-            data["filter_tags"] = filter_tags
-        if not isinstance(select_authors, list):
-            if select_authors is not None:
-                raise NektarException("`select_authors` must be a list.")
-            select_authors = []
-        if select_authors:
-            data["select_authors"] = select_authors
-        if not isinstance(select_tags, list):
-            if select_tags is not None:
-                raise NektarException("`select_tags` must be a list.")
-            select_tags = []
-        if select_tags:
-            data["select_tags"] = select_tags
-        if int(truncate) not in (0, 1):
-            raise NektarException("`truncate` must be `0` or `1`.")
-        return self.appbase.condenser().get_discussions_by_active([data])
-
-    def get_discussions_by_author_before_date(self, author, permlink, date, limit):
-        """Returns a list of discussions based on author before date.
-        https://developers.hive.io/apidefinitions/#condenser_api.get_discussions_by_author_before_date
-
-        Parameters
-        ----------
-        author : list
-            Author of the post.
-        permlink : str
-            Permlink of the post
-        date : str
-            Date before e.g. 1970-01-01T00:00:00
-        limit : int
-            Maximum number of results.
-
-        Returns
-        -------
-        list:
-            List of posts and it corresponding data.
-        """
-
-        _valid_string(author)
-        _valid_string(permlink)
-        _valid_string(date, RE_DATETIME)
-        _greater_than(limit, 0)
-        params = [author, permlink, date, limit]
-        return self.appbase.condenser().get_discussions_by_author_before_date(params)
+        
+        by = "active"
+        return self.get_discussions(
+            by,
+            tag,
+            limit,
+            filter_tags,
+            select_authors,
+            select_tags,
+            truncate)
 
     def get_discussions_by_blog(
         self,
@@ -623,31 +667,16 @@ class Nektar:
         list:
             List of discussions.
         """
-
-        data = {"tag": tag, "limit": limit, "truncate_body": truncate}
-        _valid_string(tag)
-        _within_range(limit, 1, 500)
-        if not isinstance(filter_tags, list):
-            if filter_tags is not None:
-                raise NektarException("`filter_tags` must be a list.")
-            filter_tags = []
-        if filter_tags:
-            data["filter_tags"] = filter_tags
-        if not isinstance(select_authors, list):
-            if select_authors is not None:
-                raise NektarException("`select_authors` must be a list.")
-            select_authors = []
-        if select_authors:
-            data["select_authors"] = select_authors
-        if not isinstance(select_tags, list):
-            if select_tags is not None:
-                raise NektarException("`select_tags` must be a list.")
-            select_tags = []
-        if select_tags:
-            data["select_tags"] = select_tags
-        if int(truncate) not in (0, 1):
-            raise NektarException("`truncate` must be `0` or `1`.")
-        return self.appbase.condenser().get_discussions_by_blog([data])
+        
+        by = "blog"
+        return self.get_discussions(
+            by,
+            tag,
+            limit,
+            filter_tags,
+            select_authors,
+            select_tags,
+            truncate)
 
     def get_discussions_by_cashout(
         self,
@@ -681,31 +710,16 @@ class Nektar:
         list:
             List of discussions.
         """
-
-        data = {"tag": tag, "limit": limit, "truncate_body": truncate}
-        _valid_string(tag)
-        _within_range(limit, 1, 500)
-        if not isinstance(filter_tags, list):
-            if filter_tags is not None:
-                raise NektarException("`filter_tags` must be a list.")
-            filter_tags = []
-        if filter_tags:
-            data["filter_tags"] = filter_tags
-        if not isinstance(select_authors, list):
-            if select_authors is not None:
-                raise NektarException("`select_authors` must be a list.")
-            select_authors = []
-        if select_authors:
-            data["select_authors"] = select_authors
-        if not isinstance(select_tags, list):
-            if select_tags is not None:
-                raise NektarException("`select_tags` must be a list.")
-            select_tags = []
-        if select_tags:
-            data["select_tags"] = select_tags
-        if int(truncate) not in (0, 1):
-            raise NektarException("`truncate` must be `0` or `1`.")
-        return self.appbase.condenser().get_discussions_by_cashout([data])
+        
+        by = "cashout"
+        return self.get_discussions(
+            by,
+            tag,
+            limit,
+            filter_tags,
+            select_authors,
+            select_tags,
+            truncate)
 
     def get_discussions_by_children(
         self,
@@ -739,61 +753,16 @@ class Nektar:
         list:
             List of discussions.
         """
-
-        data = {"tag": tag, "limit": limit, "truncate_body": truncate}
-        _valid_string(tag)
-        _within_range(limit, 1, 500)
-        if not isinstance(filter_tags, list):
-            if filter_tags is not None:
-                raise NektarException("`filter_tags` must be a list.")
-            filter_tags = []
-        if filter_tags:
-            data["filter_tags"] = filter_tags
-        if not isinstance(select_authors, list):
-            if select_authors is not None:
-                raise NektarException("`select_authors` must be a list.")
-            select_authors = []
-        if select_authors:
-            data["select_authors"] = select_authors
-        if not isinstance(select_tags, list):
-            if select_tags is not None:
-                raise NektarException("`select_tags` must be a list.")
-            select_tags = []
-        if select_tags:
-            data["select_tags"] = select_tags
-        if int(truncate) not in (0, 1):
-            raise NektarException("`truncate` must be `0` or `1`.")
-        return self.appbase.condenser().get_discussions_by_children([data])
-
-    def get_discussions_by_comments(
-        self,
-        author,
-        permlink,
-        limit,
-    ):
-        """Returns a list of discussions by cashout.
-        https://developers.hive.io/apidefinitions/#condenser_api.get_discussions_by_comments
-
-        Parameters
-        ----------
-        author : str
-            Start string for author name.
-        permlink : str
-            Start string for permlink.
-        limit : int
-
-        Returns
-        -------
-        list:
-            List of discussions.
-        """
-
-        _valid_string(author)
-        # allow empty start permlink
-        _valid_string(permlink)
-        _within_range(limit, 1, 100)
-        data = {"start_author": author, "start_permlink": permlink, "limit": limit}
-        return self.appbase.condenser().get_discussions_by_comments([data])
+        
+        by = "children"
+        return self.get_discussions(
+            by,
+            tag,
+            limit,
+            filter_tags,
+            select_authors,
+            select_tags,
+            truncate)
 
     def get_discussions_by_created(
         self,
@@ -827,31 +796,280 @@ class Nektar:
         list:
             List of discussions.
         """
+        
+        by = "created"
+        return self.get_discussions(
+            by,
+            tag,
+            limit,
+            filter_tags,
+            select_authors,
+            select_tags,
+            truncate)
 
-        data = {"tag": tag, "limit": limit, "truncate_body": truncate}
+    def get_discussions_by_hot(
+        self,
+        tag,
+        limit,
+        filter_tags=None,
+        select_authors=None,
+        select_tags=None,
+        truncate=0,
+    ):
+        """Returns a list of discussions by hot.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_discussions_by_hot
+
+        Parameters
+        ----------
+        tag : str
+            any valid string
+        limit : int
+            maximum number of results
+        filter_tags : list, None
+            list of valid tags
+        select_authors : list, None
+            list of valid account username
+        select_tags : list, None
+            list of valid tags
+        truncate : int, optional
+            truncate body (0, 1)
+
+        Returns
+        -------
+        list:
+            List of discussions.
+        """
+        
+        by = "hot"
+        return self.get_discussions(
+            by,
+            tag,
+            limit,
+            filter_tags,
+            select_authors,
+            select_tags,
+            truncate)
+    
+    def get_discussions_by_promoted(
+        self,
+        tag,
+        limit,
+        filter_tags=None,
+        select_authors=None,
+        select_tags=None,
+        truncate=0,
+    ):
+        """Returns a list of discussions by promoted
+        https://developers.hive.io/apidefinitions/#condenser_api.get_discussions_by_promoted
+
+        Parameters
+        ----------
+        tag : str
+            any valid string
+        limit : int
+            maximum number of results
+        filter_tags : list, None
+            list of valid tags
+        select_authors : list, None
+            list of valid account username
+        select_tags : list, None
+            list of valid tags
+        truncate : int, optional
+            truncate body (0, 1)
+
+        Returns
+        -------
+        list:
+            List of discussions.
+        """
+        
+        by = "promoted"
+        return self.get_discussions(
+            by,
+            tag,
+            limit,
+            filter_tags,
+            select_authors,
+            select_tags,
+            truncate)
+    
+    def get_discussions_by_trending(
+        self,
+        tag,
+        limit,
+        filter_tags=None,
+        select_authors=None,
+        select_tags=None,
+        truncate=0,
+    ):
+        """Returns a list of discussions by trending.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_discussions_by_trending
+
+        Parameters
+        ----------
+        tag : str
+            any valid string
+        limit : int
+            maximum number of results
+        filter_tags : list, None
+            list of valid tags
+        select_authors : list, None
+            list of valid account username
+        select_tags : list, None
+            list of valid tags
+        truncate : int, optional
+            truncate body (0, 1)
+
+        Returns
+        -------
+        list:
+            List of discussions.
+        """
+        
+        by = "trending"
+        return self.get_discussions(
+            by,
+            tag,
+            limit,
+            filter_tags,
+            select_authors,
+            select_tags,
+            truncate)
+    
+    def get_discussions_by_votes(
+        self,
+        tag,
+        limit,
+        filter_tags=None,
+        select_authors=None,
+        select_tags=None,
+        truncate=0,
+    ):
+        """Returns a list of discussions by trending.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_discussions_by_votes
+
+        Parameters
+        ----------
+        tag : str
+            any valid string
+        limit : int
+            maximum number of results
+        filter_tags : list, None
+            list of valid tags
+        select_authors : list, None
+            list of valid account username
+        select_tags : list, None
+            list of valid tags
+        truncate : int, optional
+            truncate body (0, 1)
+
+        Returns
+        -------
+        list:
+            List of discussions.
+        """
+        
+        by = "votes"
+        return self.get_discussions(
+            by,
+            tag,
+            limit,
+            filter_tags,
+            select_authors,
+            select_tags,
+            truncate)
+
+    def get_discussions_by_author_before_date(self, author, permlink, date, limit):
+        """Returns a list of discussions based on author before date.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_discussions_by_author_before_date
+
+        Parameters
+        ----------
+        author : list
+            Author of the post.
+        permlink : str
+            Permlink of the post
+        date : str
+            Date before e.g. 1970-01-01T00:00:00
+        limit : int
+            Maximum number of results.
+
+        Returns
+        -------
+        list:
+            List of posts and it corresponding data.
+        """
+
+        _valid_string(author)
+        _valid_string(permlink)
+        _valid_string(date, RE_DATETIME)
+        _greater_than(limit, 0)
+        params = [author, permlink, date, limit]
+        return self.appbase.condenser().get_discussions_by_author_before_date(params)
+
+    def get_discussions_by_comments(
+        self,
+        author,
+        permlink,
+        limit,
+    ):
+        """Returns a list of discussions by cashout.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_discussions_by_comments
+
+        Parameters
+        ----------
+        author : str
+            Start string for author name.
+        permlink : str
+            Start string for permlink.
+        limit : int
+
+        Returns
+        -------
+        list:
+            List of discussions.
+        """
+
+        _valid_string(author)
+        # allow empty start permlink
+        _valid_string(permlink)
+        _within_range(limit, 1, 100)
+        data = {"start_author": author, "start_permlink": permlink, "limit": limit}
+        return self.appbase.condenser().get_discussions_by_comments([data])
+
+    def get_discussions_by_feed(
+        self,
+        tag,
+        author,
+        permlink,
+        limit,
+    ):
+        """Returns a list of discussions by feed.
+        https://developers.hive.io/apidefinitions/#condenser_api.get_discussions_by_feed
+
+        Parameters
+        ----------
+        tag : str
+            any valid string
+        author : str
+            Start string for author name.
+        permlink : str
+            Start string for permlink.
+        limit : int
+
+        Returns
+        -------
+        list:
+            List of discussions.
+        """
+
         _valid_string(tag)
-        _within_range(limit, 1, 500)
-        if not isinstance(filter_tags, list):
-            if filter_tags is not None:
-                raise NektarException("`filter_tags` must be a list.")
-            filter_tags = []
-        if filter_tags:
-            data["filter_tags"] = filter_tags
-        if not isinstance(select_authors, list):
-            if select_authors is not None:
-                raise NektarException("`select_authors` must be a list.")
-            select_authors = []
-        if select_authors:
-            data["select_authors"] = select_authors
-        if not isinstance(select_tags, list):
-            if select_tags is not None:
-                raise NektarException("`select_tags` must be a list.")
-            select_tags = []
-        if select_tags:
-            data["select_tags"] = select_tags
-        if int(truncate) not in (0, 1):
-            raise NektarException("`truncate` must be `0` or `1`.")
-        return self.appbase.condenser().get_discussions_by_created([data])
+        _valid_string(author)
+        # allow empty start permlink
+        _valid_string(permlink)
+        _within_range(limit, 1, 100)
+        data = {"tag": tag, "start_author": author, "start_permlink": permlink, "limit": limit}
+        return self.appbase.condenser().get_discussions_by_feed([data])
 
     def find_proposals(self, pid):
         """Finds proposals by proposal id.

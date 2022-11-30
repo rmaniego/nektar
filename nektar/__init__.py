@@ -7,7 +7,7 @@ Hive API SDK built for Python.
 
 """
 
-__version__ = "0.10.14"
+__version__ = "0.10.15"
 from .nektar import Nektar, Waggle, Swarm
 from .appbase import AppBase
 
