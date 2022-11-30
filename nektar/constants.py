@@ -234,7 +234,7 @@ APPBASE_API = {
     "reputation_api": ["get_account_reputations"],
 }
 
-DISCUSSIONS_BY = ("active", "blog", "cashout", "children", "created", "hot", "promoted", "trending", "votes")
+DISCUSSIONS_BY = ("active", "blog", "cashout", "children", "created", "hot", "payout", "promoted", "trending", "votes")
 
 """
     Hive Blockchain Operations

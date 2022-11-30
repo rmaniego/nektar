@@ -4,7 +4,10 @@
 ## Nektar Module > Condenser Specific
 The condenser methods can directly be used using the AppBase class, but will require valid formatting of the parameters. Using the Nektar class easily create an abstraction for easier usage of the API methods.
 
-Check the ReadMe for the initialization process.
+**Initialization**
+```python
+hive = Condenser()
+```
 
 **get_account_count**
 ```python

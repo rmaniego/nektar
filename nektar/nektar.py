@@ -21,15 +21,19 @@ from .appbase import AppBase
 from .constants import (
     NEKTAR_VERSION,
     BLOCKCHAIN_OPERATIONS,
-    DISCUSSIONS_BY,
     ASSETS,
     ROLES,
-    DATETIME_FORMAT,
-    RE_PERMLINK,
-    RE_COMMUNITY,
-    RE_DATETIME
+    DATETIME_FORMAT
 )
-from .exceptions import NektarException
+from .utils import (
+    NektarException,
+    check_wifs,
+    make_expiration,
+    valid_string,
+    greater_than,
+    within_range,
+    is_boolean
+)
 
 
 class Nektar:
@@ -90,1107 +94,6 @@ class Nektar:
 
         # lazy mode
         self.config = None
-
-    ##################################################
-    # raw condenser api methods                      #
-    ##################################################
-    def get_account_count(self):
-        """Returns the number of accounts.
-        https://developers.hive.io/apidefinitions/#condenser_api.get_account_count
-
-        Returns
-        -------
-        int:
-            The total number of blockchain accounts to date.
-        """
-
-        return self.appbase.condenser().get_account_count([])
-
-    def get_account_history(self, account, start, limit, low=None, high=None):
-        """Returns a history of all operations for a given account.
-        https://developers.hive.io/apidefinitions/#condenser_api.get_account_history https://gitlab.syncad.com/hive/hive/-/blob/master/libraries/protocol/include/hive/protocol/operations.hpp
-
-        Parameters
-        ----------
-        account : str
-            any valid Hive account username
-        start : int
-            starting range, or -1 for reverse history
-        limit : int
-            upperbound limit 1-1000
-        low : int, optional
-            operation id (Default is None)
-        high : int, optional
-            operation id (Default is None)
-
-        Returns
-        -------
-        list:
-            List of all transactions from start-limit to limit.
-        """
-
-        params = [self.username]
-        if isinstance(account, str):
-            params[0] = account
-        params.append(_greater_than(start, -1))
-        params.append(_within_range(limit, 1, 1000))
-
-        operations = list(range(len(BLOCKCHAIN_OPERATIONS)))
-        if isinstance(low, int):
-            ## for the first 64 blockchain operation
-            if int(low) not in operations:
-                raise NektarException(
-                    "Operation Filter `low` is not a valid blockchain operation ID."
-                )
-            params.append(int("1".ljust(low + 1, "0"), 2))
-
-        if isinstance(high, int):
-            ## for the next 64 blockchain operation
-            if high not in operations:
-                raise NektarException(
-                    "Operation Filter `high` is not a valid blockchain operation ID."
-                )
-            params.append(0)  # set to `operation_filter_low` zero
-            params.append(int("1".ljust(high + 1, "0"), 2))
-
-        return self.appbase.condenser().get_account_history(params)
-
-    def get_account_reputations(self, start, limit):
-        """Returns a list of account reputations.
-        https://developers.hive.io/apidefinitions/#condenser_api.get_account_reputations
-
-        Parameters
-        ----------
-        start : str
-            any valid Hive account username
-        limit : int
-            limit 1-1000
-
-        Returns
-        -------
-        list:
-            List of all account reputation.
-        """
-
-        _valid_string(start)
-        _within_range(limit, 1, 1000)
-        params = [start, int(limit)]
-        return self.appbase.condenser().get_account_reputations(params)
-
-    def get_accounts(self, accounts, delayed_votes_active):
-        """Returns accounts, queried by name.
-        https://developers.hive.io/apidefinitions/#condenser_api.get_accounts
-
-        Parameters
-        ----------
-        accounts : list
-            a list of any valid Hive account usernames
-        delayed_votes_active : bool
-            delayed votes hidden
-
-        Returns
-        -------
-        list:
-            List of all accounts and its information.
-        """
-
-        params = [accounts, delayed_votes_active]
-        if not isinstance(accounts, list):
-            raise NektarException("`accounts` must be a list of strings.")
-        _is_boolean("delayed_votes_active", delayed_votes_active)
-
-        return self.appbase.condenser().get_accounts(params)
-
-    def get_active_votes(self, author, permlink):
-        """Returns all votes for the given post.
-        https://developers.hive.io/apidefinitions/#condenser_api.get_active_votes
-
-        Parameters
-        ----------
-        author : list
-            Author of the post.
-        permlink : str
-            Permlink of the post
-
-        Returns
-        -------
-        list:
-            List of all active votes on a post.
-        """
-
-        _valid_string(author)
-        _valid_string(permlink)
-        params = [author, permlink]
-        return self.appbase.condenser().get_active_votes(params)
-
-    def get_active_witnesses(self):
-        """Returns the list of active witnesses.
-        https://developers.hive.io/apidefinitions/#condenser_api.get_active_witnesses
-
-        Returns
-        -------
-        list:
-            List of active witnesses.
-        """
-
-        return self.appbase.condenser().get_active_witnesses([])
-
-    def get_block(self, block_num):
-        """Returns a block.
-        https://developers.hive.io/apidefinitions/#condenser_api.get_block
-
-        Parameters
-        ----------
-        block_num : int
-            block number
-
-        Returns
-        -------
-        dict:
-            Dictionary of block information.
-        """
-
-        _greater_than(block_num, 0)
-        return self.appbase.condenser().get_block([int(block_num)])
-
-    def get_block_header(self, block_num):
-        """Returns a block header.
-        https://developers.hive.io/apidefinitions/#condenser_api.get_block_header
-
-        Parameters
-        ----------
-        block_num : int
-            block number
-
-        Returns
-        -------
-        dict:
-            Dictionary of block header information.
-        """
-
-        _greater_than(block_num, 0)
-        return self.appbase.condenser().get_block_header([block_num])
-
-    def get_blog(self, account, start, limit):
-        """Returns the list of blog entries for an account.
-        https://developers.hive.io/apidefinitions/#condenser_api.get_blog
-
-        Parameters
-        ----------
-        account : str
-            any valid Hive account username
-        start : int
-            starting entry id
-        limit : int
-            maximum number of results 1-500
-
-        Returns
-        -------
-        list:
-            List of blogs and its information
-        """
-
-        _valid_string(account)
-        start = _greater_than(start, 0)
-        limit = _within_range(limit, 1, 500)
-        params = [account, start, limit]
-        return self.appbase.condenser().get_blog(params)
-
-    def get_blog_authors(self, account):
-        """Returns a list of authors that have had their content reblogged on a given blog account.
-        https://developers.hive.io/apidefinitions/#condenser_api.get_blog_authors
-
-        Issue
-        ---------
-             Assert Exception:false: Supported by hivemind
-
-        Parameters
-        ----------
-        account : str
-            any valid Hive account username
-
-        Returns
-        -------
-        dict:
-            Dictionary of block header information.
-        """
-
-        _valid_string(account)
-        return self.appbase.condenser().get_blog_authors([account])
-
-    def get_blog_entries(self, account, start, limit):
-        """Returns a list of blog entries for an account.
-        https://developers.hive.io/apidefinitions/#condenser_api.get_blog_entries
-
-        Parameters
-        ----------
-        account : str
-            any valid Hive account username
-        start : int
-            starting entry id
-        limit : int
-            maximum number of results 1-500
-
-        Returns
-        -------
-        list:
-            List of blogs and its basic information without the full blog data.
-        """
-
-        _valid_string(account)
-        start = _greater_than(start, 0)
-        limit = _within_range(limit, 1, 500)
-        params = [account, start, limit]
-        return self.appbase.condenser().get_blog_entries(params)
-
-    def get_chain_properties(self):
-        """Returns the chain properties.
-        https://developers.hive.io/apidefinitions/#condenser_api.get_chain_properties
-
-        Returns
-        -------
-        dict:
-            Dictionary of chain properties and its data.
-        """
-
-        return self.appbase.condenser().get_chain_properties([])
-
-    def get_comment_discussions_by_payout(
-        self,
-        tag,
-        limit,
-        filter_tags=None,
-        select_authors=None,
-        select_tags=None,
-        truncate=0,
-    ):
-        """Returns a list of discussions based on payout.
-        https://developers.hive.io/apidefinitions/#condenser_api.get_comment_discussions_by_payout
-
-        Parameters
-        ----------
-        tag : str
-            any valid string
-        limit : int
-            maximum number of results
-        filter_tags : list, None
-            list of valid tags
-        select_authors : list, None
-            list of valid account username
-        select_tags : list, None
-            list of valid tags
-        truncate : int, optional
-            truncate body (0, 1)
-
-        Returns
-        -------
-        list:
-            List of discussions.
-        """
-
-        data = {"tag": tag, "limit": limit, "truncate_body": truncate}
-        _valid_string(tag)
-        _within_range(limit, 1, 500)
-        if not isinstance(filter_tags, list):
-            if filter_tags is not None:
-                raise NektarException("`filter_tags` must be a list.")
-            filter_tags = []
-        if filter_tags:
-            data["filter_tags"] = filter_tags
-        if not isinstance(select_authors, list):
-            if select_authors is not None:
-                raise NektarException("`select_authors` must be a list.")
-            select_authors = []
-        if select_authors:
-            data["select_authors"] = select_authors
-        if not isinstance(select_tags, list):
-            if select_tags is not None:
-                raise NektarException("`select_tags` must be a list.")
-            select_tags = []
-        if select_tags:
-            data["select_tags"] = select_tags
-        if int(truncate) not in (0, 1):
-            raise NektarException("`truncate` must be `0` or `1`.")
-        return self.appbase.condenser().get_comment_discussions_by_payout([data])
-
-    def get_config(self):
-        """Returns information about compile-time constants.
-        https://developers.hive.io/apidefinitions/#condenser_api.get_config
-        https://developers.hive.io/tutorials-recipes/understanding-configuration-values.html
-
-        Parameters
-        ----------
-        pid : int
-            proposal.id, not proposal.proposal_id
-
-
-        Returns
-        -------
-        dict:
-            A dictionary blockchain configurations.
-        """
-
-        return self.appbase.condenser().get_config([])
-
-    def get_content(self, author, permlink):
-        """Returns the content of a post or comment.
-        https://developers.hive.io/apidefinitions/#condenser_api.get_content
-
-        Parameters
-        ----------
-        author : list
-            Author of the post.
-        permlink : str
-            Permlink of the post
-
-        Returns
-        -------
-        dict:
-            All data associated to a post or comment.
-        """
-        
-        _valid_string(author)
-        _valid_string(permlink)
-        params = [author, permlink]
-        return self.appbase.condenser().get_content(params)
-
-    def get_content_replies(self, author, permlink):
-        """Returns a list of replies.
-        https://developers.hive.io/apidefinitions/#condenser_api.get_content_replies
-
-        Parameters
-        ----------
-        author : list
-            Author of the post.
-        permlink : str
-            Permlink of the post
-
-        Returns
-        -------
-        list:
-            List of replies to a post or comment.
-        """
-
-        _valid_string(author)
-        _valid_string(permlink)
-        params = [author, permlink]
-        return self.appbase.condenser().get_content_replies(params)
-
-    def get_conversion_requests(self, cid):
-        """Returns a list of conversion request.
-        https://developers.hive.io/apidefinitions/#condenser_api.get_conversion_requests
-
-        Parameters
-        ----------
-        cid : int
-            conversion request id
-
-        Returns
-        -------
-        list:
-            List of conversion requests.
-        """
-
-        _greater_than(cid, 0)
-        return self.appbase.condenser().get_conversion_requests([cid])
-
-    def get_current_median_history_price(self):
-        """Returns the median history price.
-        https://developers.hive.io/apidefinitions/#condenser_api.get_current_median_history_price
-
-        Returns
-        -------
-        dict:
-            Data on the median history price.
-        """
-
-        return self.appbase.condenser().get_current_median_history_price([])
-    
-    def get_discussions(
-        self,
-        by,
-        tag,
-        limit,
-        filter_tags=None,
-        select_authors=None,
-        select_tags=None,
-        truncate=0,
-    ):
-        """Returns a list of discussions.
-
-        Parameters
-        ----------
-        by : str
-            `promoted`
-        tag : str
-            any valid string
-        limit : int
-            maximum number of results
-        filter_tags : list, None
-            list of valid tags
-        select_authors : list, None
-            list of valid account username
-        select_tags : list, None
-            list of valid tags
-        truncate : int, optional
-            truncate body (0, 1)
-
-        Returns
-        -------
-        list:
-            List of discussions.
-        """
-        
-        _valid_string(by)
-        if by not in DISCUSSIONS_BY:
-            raise NektarException("`by` must be a value in:", ",".join(DISCUSSIONS_BY))
-        
-        _valid_string(tag)
-        _within_range(limit, 1, 500)
-        _within_range(truncate, 0, 1)
-        
-        # initial parameters
-        data = {"tag": tag, "limit": limit, "truncate_body": truncate}
-        
-        # custom filters
-        if not isinstance(filter_tags, list):
-            if filter_tags is not None:
-                raise NektarException("`filter_tags` must be a list.")
-            filter_tags = []
-        if filter_tags:
-            data["filter_tags"] = filter_tags
-        if not isinstance(select_authors, list):
-            if select_authors is not None:
-                raise NektarException("`select_authors` must be a list.")
-            select_authors = []
-        if select_authors:
-            data["select_authors"] = select_authors
-        if not isinstance(select_tags, list):
-            if select_tags is not None:
-                raise NektarException("`select_tags` must be a list.")
-            select_tags = []
-        if select_tags:
-            data["select_tags"] = select_tags
-
-        match by:
-            case "active":
-                return self.appbase.condenser().get_discussions_by_active([data])
-            case "blog":
-                return self.appbase.condenser().get_discussions_by_blog([data])
-            case "cashout":
-                return self.appbase.condenser().get_discussions_by_cashout([data])
-            case "children":
-                return self.appbase.condenser().get_discussions_by_children([data])
-            case "created":
-                return self.appbase.condenser().get_discussions_by_created([data])
-            case "hot":
-                return self.appbase.condenser().get_discussions_by_hot([data])
-            case "promoted":
-                return self.appbase.condenser().get_discussions_by_promoted([data])
-            case "trending":
-                return self.appbase.condenser().get_discussions_by_trending([data])
-            case "votes":
-                return self.appbase.condenser().get_discussions_by_trending([data])
-
-    def get_discussions_by_active(
-        self,
-        tag,
-        limit,
-        filter_tags=None,
-        select_authors=None,
-        select_tags=None,
-        truncate=0,
-    ):
-        """Returns a list of discussions based on active.
-        https://developers.hive.io/apidefinitions/#condenser_api.get_discussions_by_active
-
-        Parameters
-        ----------
-        tag : str
-            any valid string
-        limit : int
-            maximum number of results
-        filter_tags : list, None
-            list of valid tags
-        select_authors : list, None
-            list of valid account username
-        select_tags : list, None
-            list of valid tags
-        truncate : int, optional
-            truncate body (0, 1)
-
-        Returns
-        -------
-        list:
-            List of discussions.
-        """
-        
-        by = "active"
-        return self.get_discussions(
-            by,
-            tag,
-            limit,
-            filter_tags,
-            select_authors,
-            select_tags,
-            truncate)
-
-    def get_discussions_by_blog(
-        self,
-        tag,
-        limit,
-        filter_tags=None,
-        select_authors=None,
-        select_tags=None,
-        truncate=0,
-    ):
-        """Returns a list of discussions by blog.
-        https://developers.hive.io/apidefinitions/#condenser_api.get_discussions_by_blog
-
-        Parameters
-        ----------
-        tag : str
-            any valid string
-        limit : int
-            maximum number of results
-        filter_tags : list, None
-            list of valid tags
-        select_authors : list, None
-            list of valid account username
-        select_tags : list, None
-            list of valid tags
-        truncate : int, optional
-            truncate body (0, 1)
-
-        Returns
-        -------
-        list:
-            List of discussions.
-        """
-        
-        by = "blog"
-        return self.get_discussions(
-            by,
-            tag,
-            limit,
-            filter_tags,
-            select_authors,
-            select_tags,
-            truncate)
-
-    def get_discussions_by_cashout(
-        self,
-        tag,
-        limit,
-        filter_tags=None,
-        select_authors=None,
-        select_tags=None,
-        truncate=0,
-    ):
-        """Returns a list of discussions by cashout.
-        https://developers.hive.io/apidefinitions/#condenser_api.get_discussions_by_cashout
-
-        Parameters
-        ----------
-        tag : str
-            any valid string
-        limit : int
-            maximum number of results
-        filter_tags : list, None
-            list of valid tags
-        select_authors : list, None
-            list of valid account username
-        select_tags : list, None
-            list of valid tags
-        truncate : int, optional
-            truncate body (0, 1)
-
-        Returns
-        -------
-        list:
-            List of discussions.
-        """
-        
-        by = "cashout"
-        return self.get_discussions(
-            by,
-            tag,
-            limit,
-            filter_tags,
-            select_authors,
-            select_tags,
-            truncate)
-
-    def get_discussions_by_children(
-        self,
-        tag,
-        limit,
-        filter_tags=None,
-        select_authors=None,
-        select_tags=None,
-        truncate=0,
-    ):
-        """Returns a list of discussions by cashout.
-        https://developers.hive.io/apidefinitions/#condenser_api.get_discussions_by_children
-
-        Parameters
-        ----------
-        tag : str
-            any valid string
-        limit : int
-            maximum number of results
-        filter_tags : list, None
-            list of valid tags
-        select_authors : list, None
-            list of valid account username
-        select_tags : list, None
-            list of valid tags
-        truncate : int, optional
-            truncate body (0, 1)
-
-        Returns
-        -------
-        list:
-            List of discussions.
-        """
-        
-        by = "children"
-        return self.get_discussions(
-            by,
-            tag,
-            limit,
-            filter_tags,
-            select_authors,
-            select_tags,
-            truncate)
-
-    def get_discussions_by_created(
-        self,
-        tag,
-        limit,
-        filter_tags=None,
-        select_authors=None,
-        select_tags=None,
-        truncate=0,
-    ):
-        """Returns a list of discussions by created
-        https://developers.hive.io/apidefinitions/#condenser_api.get_discussions_by_created
-
-        Parameters
-        ----------
-        tag : str
-            any valid string
-        limit : int
-            maximum number of results
-        filter_tags : list, None
-            list of valid tags
-        select_authors : list, None
-            list of valid account username
-        select_tags : list, None
-            list of valid tags
-        truncate : int, optional
-            truncate body (0, 1)
-
-        Returns
-        -------
-        list:
-            List of discussions.
-        """
-        
-        by = "created"
-        return self.get_discussions(
-            by,
-            tag,
-            limit,
-            filter_tags,
-            select_authors,
-            select_tags,
-            truncate)
-
-    def get_discussions_by_hot(
-        self,
-        tag,
-        limit,
-        filter_tags=None,
-        select_authors=None,
-        select_tags=None,
-        truncate=0,
-    ):
-        """Returns a list of discussions by hot.
-        https://developers.hive.io/apidefinitions/#condenser_api.get_discussions_by_hot
-
-        Parameters
-        ----------
-        tag : str
-            any valid string
-        limit : int
-            maximum number of results
-        filter_tags : list, None
-            list of valid tags
-        select_authors : list, None
-            list of valid account username
-        select_tags : list, None
-            list of valid tags
-        truncate : int, optional
-            truncate body (0, 1)
-
-        Returns
-        -------
-        list:
-            List of discussions.
-        """
-        
-        by = "hot"
-        return self.get_discussions(
-            by,
-            tag,
-            limit,
-            filter_tags,
-            select_authors,
-            select_tags,
-            truncate)
-    
-    def get_discussions_by_promoted(
-        self,
-        tag,
-        limit,
-        filter_tags=None,
-        select_authors=None,
-        select_tags=None,
-        truncate=0,
-    ):
-        """Returns a list of discussions by promoted
-        https://developers.hive.io/apidefinitions/#condenser_api.get_discussions_by_promoted
-
-        Parameters
-        ----------
-        tag : str
-            any valid string
-        limit : int
-            maximum number of results
-        filter_tags : list, None
-            list of valid tags
-        select_authors : list, None
-            list of valid account username
-        select_tags : list, None
-            list of valid tags
-        truncate : int, optional
-            truncate body (0, 1)
-
-        Returns
-        -------
-        list:
-            List of discussions.
-        """
-        
-        by = "promoted"
-        return self.get_discussions(
-            by,
-            tag,
-            limit,
-            filter_tags,
-            select_authors,
-            select_tags,
-            truncate)
-    
-    def get_discussions_by_trending(
-        self,
-        tag,
-        limit,
-        filter_tags=None,
-        select_authors=None,
-        select_tags=None,
-        truncate=0,
-    ):
-        """Returns a list of discussions by trending.
-        https://developers.hive.io/apidefinitions/#condenser_api.get_discussions_by_trending
-
-        Parameters
-        ----------
-        tag : str
-            any valid string
-        limit : int
-            maximum number of results
-        filter_tags : list, None
-            list of valid tags
-        select_authors : list, None
-            list of valid account username
-        select_tags : list, None
-            list of valid tags
-        truncate : int, optional
-            truncate body (0, 1)
-
-        Returns
-        -------
-        list:
-            List of discussions.
-        """
-        
-        by = "trending"
-        return self.get_discussions(
-            by,
-            tag,
-            limit,
-            filter_tags,
-            select_authors,
-            select_tags,
-            truncate)
-    
-    def get_discussions_by_votes(
-        self,
-        tag,
-        limit,
-        filter_tags=None,
-        select_authors=None,
-        select_tags=None,
-        truncate=0,
-    ):
-        """Returns a list of discussions by trending.
-        https://developers.hive.io/apidefinitions/#condenser_api.get_discussions_by_votes
-
-        Parameters
-        ----------
-        tag : str
-            any valid string
-        limit : int
-            maximum number of results
-        filter_tags : list, None
-            list of valid tags
-        select_authors : list, None
-            list of valid account username
-        select_tags : list, None
-            list of valid tags
-        truncate : int, optional
-            truncate body (0, 1)
-
-        Returns
-        -------
-        list:
-            List of discussions.
-        """
-        
-        by = "votes"
-        return self.get_discussions(
-            by,
-            tag,
-            limit,
-            filter_tags,
-            select_authors,
-            select_tags,
-            truncate)
-
-    def get_discussions_by_author_before_date(self, author, permlink, date, limit):
-        """Returns a list of discussions based on author before date.
-        https://developers.hive.io/apidefinitions/#condenser_api.get_discussions_by_author_before_date
-
-        Parameters
-        ----------
-        author : list
-            Author of the post.
-        permlink : str
-            Permlink of the post
-        date : str
-            Date before e.g. 1970-01-01T00:00:00
-        limit : int
-            Maximum number of results.
-
-        Returns
-        -------
-        list:
-            List of posts and it corresponding data.
-        """
-
-        _valid_string(author)
-        _valid_string(permlink)
-        _valid_string(date, RE_DATETIME)
-        _greater_than(limit, 0)
-        params = [author, permlink, date, limit]
-        return self.appbase.condenser().get_discussions_by_author_before_date(params)
-
-    def get_discussions_by_comments(
-        self,
-        author,
-        permlink,
-        limit,
-    ):
-        """Returns a list of discussions by cashout.
-        https://developers.hive.io/apidefinitions/#condenser_api.get_discussions_by_comments
-
-        Parameters
-        ----------
-        author : str
-            Start string for author name.
-        permlink : str
-            Start string for permlink.
-        limit : int
-
-        Returns
-        -------
-        list:
-            List of discussions.
-        """
-
-        _valid_string(author)
-        # allow empty start permlink
-        _valid_string(permlink)
-        _within_range(limit, 1, 100)
-        data = {"start_author": author, "start_permlink": permlink, "limit": limit}
-        return self.appbase.condenser().get_discussions_by_comments([data])
-
-    def get_discussions_by_feed(
-        self,
-        tag,
-        author,
-        permlink,
-        limit,
-    ):
-        """Returns a list of discussions by feed.
-        https://developers.hive.io/apidefinitions/#condenser_api.get_discussions_by_feed
-
-        Parameters
-        ----------
-        tag : str
-            any valid string
-        author : str
-            Start string for author name.
-        permlink : str
-            Start string for permlink.
-        limit : int
-
-        Returns
-        -------
-        list:
-            List of discussions.
-        """
-
-        _valid_string(tag)
-        _valid_string(author)
-        # allow empty start permlink
-        _valid_string(permlink)
-        _within_range(limit, 1, 100)
-        data = {"tag": tag, "start_author": author, "start_permlink": permlink, "limit": limit}
-        return self.appbase.condenser().get_discussions_by_feed([data])
-
-    def find_proposals(self, pid):
-        """Finds proposals by proposal id.
-        https://developers.hive.io/apidefinitions/#condenser_api.find_proposals
-
-        Parameters
-        ----------
-        pid : int
-            proposal.id, not proposal.proposal_id
-
-
-        Returns
-        -------
-        dict:
-            A dictionary format of the proposal data.
-        """
-
-        _greater_than(pid, 0)
-        return self.appbase.condenser().find_proposals([[pid]])
-
-    def list_proposal_votes(self, start, limit, order, direction=None, status=None):
-        """Returns all proposal votes, starting with the specified voter or proposal.id.
-        https://developers.hive.io/apidefinitions/#condenser_api.list_proposal_votes
-
-        Parameters
-        ----------
-        start : int, str
-            proposal id, or account name voting for the proposal
-        limit : int
-            number of votes, 0-1000
-        order: str
-            `by_voter_proposal` - order by proposal voter
-            `by_proposal_voter` - order by proposal.id
-        direction : str, None
-            `ascending` or `descending`
-        status : str, None
-            `all`, `inactive`, `active`, `expired`, or `votable`
-
-        Returns
-        -------
-        list:
-            A list of proposals votes.
-        """
-
-        params = [[""], 1000, "by_voter_proposal", "ascending", "all"]
-
-        if not isinstance(start, (str, int)):
-            raise NektarException("`start` must be a voter acount name or proposal id.")
-        params[0][0] = start
-
-        params[1] = _within_range(limit, 0, 1000)
-        if order not in ("by_voter_proposal", "by_proposal_voter"):
-            raise NektarException("`order` is not supported.")
-        params[2] = order
-
-        if direction is not None:
-            if direction not in ("ascending", "descending"):
-                raise NektarException("`direction` is not supported.")
-            params[3] = direction
-
-        if status is not None:
-            statuses = ("all", "inactive", "active", "expired", "votable")
-            if status not in statuses:
-                raise NektarException("`status` is not supported.")
-            params[4] = status
-
-        return self.appbase.condenser().list_proposal_votes(params)
-
-    def list_proposals(self, start, limit, order, direction=None, status=None):
-        """Returns all proposals, starting with the specified creator or start date.
-        https://developers.hive.io/apidefinitions/#condenser_api.list_proposals
-
-        Parameters
-        ----------
-        start : int, str
-            `creator` - creator of the proposal
-            `start_date` - start date of the proposal, e.g. "2022-11-27T00:00:00"
-            `end_date` - end date of the proposal, e.g. "2022-11-27T00:00:00"
-            `total_votes` - total votes of the proposal
-        limit : int
-            number of votes, 0-1000
-        order: str
-            `by_creator` - order by proposal creator
-            `by_start_date` - order by proposal start date
-            `by_end_date` - order by proposal end date
-            `by_total_votes` - order by proposal total votes
-        direction : str, None
-            `ascending` or `descending`
-        status : str, None
-            `all`, `inactive`, `active`, `expired`, or `votable`
-
-        Returns
-        -------
-        list:
-            A list of proposals votes.
-        """
-
-        params = [[""], 1000, "by_creator", "ascending", "all"]
-
-        if not isinstance(start, (str, int)):
-            raise NektarException("`start` must be a voter acount name or proposal id.")
-        params[0][0] = start
-        params[1] = _within_range(limit, 0, 1000)
-
-        orders = ("by_creator", "by_start_date", "by_end_date", "by_total_votes")
-        if order not in orders:
-            raise NektarException("`order` is not supported.")
-        params[2] = order
-
-        if direction is not None:
-            if direction not in ("ascending", "descending"):
-                raise NektarException("`direction` is not supported.")
-            params[3] = direction
-
-        if status is not None:
-            statuses = ("all", "inactive", "active", "expired", "votable")
-            if status not in statuses:
-                raise NektarException("`status` is not supported.")
-            params[4] = status
-
-        return self.appbase.condenser().list_proposals(params)
 
     ##################################################
     # wrapped methods                                #
@@ -1454,7 +357,7 @@ class Nektar:
         # active and posting roles
         if len(required_auths):
             role = "custom_json"
-        if not _check_wifs(self.roles, role):
+        if not check_wifs(self.roles, role):
             raise NektarException(
                 "The `custom_json` operation requires"
                 "one of the following private keys:" + ", ".join(ROLES[role])
@@ -1477,9 +380,9 @@ class Nektar:
         data["json"] = json.dumps(jdata).replace("'", '\\"')
 
         ref_block_num, ref_block_prefix = self.get_reference_block_data()
-        expire = _within_range(expire, 5, 120, 30)
-        expiration = _make_expiration(expire)
-        synchronous = _is_boolean(synchronous, False)
+        expire = within_range(expire, 5, 120, 30)
+        expiration = make_expiration(expire)
+        synchronous = is_boolean(synchronous, False)
 
         operations = [["custom_json", data]]
         transaction = {
@@ -1574,11 +477,11 @@ class Nektar:
         operations[0][1] = data
 
         ref_block_num, ref_block_prefix = self.get_reference_block_data()
-        expire = _within_range(expire, 5, 120, 30)
-        expiration = _make_expiration(expire)
-        synchronous = _is_boolean(synchronous, False)
-        strict = _is_boolean(strict, True)
-        debug = _is_boolean(debug, False)
+        expire = within_range(expire, 5, 120, 30)
+        expiration = make_expiration(expire)
+        synchronous = is_boolean(synchronous, False)
+        strict = is_boolean(strict, True)
+        debug = is_boolean(debug, False)
 
         transaction = {
             "ref_block_num": ref_block_num,
@@ -1783,7 +686,7 @@ class Waggle(Nektar):
             params["query"] = query
 
         # custom limits by nektar, hive api limit: 100
-        custom_limit = _within_range(limit, 1, 10000, 100)
+        custom_limit = within_range(limit, 1, 10000, 100)
         crawls = custom_limit // 100
         params["limit"] = custom_limit
         if crawls > 0:
@@ -1833,7 +736,7 @@ class Waggle(Nektar):
                 )
 
         # custom limits by nektar, hive api limit: 100
-        custom_limit = _within_range(limit, 1, 10000, 100)
+        custom_limit = within_range(limit, 1, 10000, 100)
         crawls = custom_limit // 100
         params["limit"] = custom_limit
         if crawls > 0:
@@ -1873,7 +776,7 @@ class Waggle(Nektar):
         params = ["", 1]
 
         # custom limits by nektar, hive api limit: 1000
-        custom_limit = _within_range(limit, 1, 10000, 100)
+        custom_limit = within_range(limit, 1, 10000, 100)
         crawls = custom_limit // 100
         params[1] = custom_limit
         if crawls > 0:
@@ -1935,7 +838,7 @@ class Waggle(Nektar):
                 params[2] = "ignore"
 
         # custom limits by nektar, hive api limit: 1000
-        custom_limit = _within_range(limit, 1, 10000, 100)
+        custom_limit = within_range(limit, 1, 10000, 100)
         crawls = custom_limit // 100
         params[3] = custom_limit
         if crawls > 0:
@@ -2130,7 +1033,7 @@ class Waggle(Nektar):
         params["observer"] = self.username
 
         # custom limits by nektar, hive api limit: 100?
-        limit = _within_range(limit, 1, 1000, 100)
+        limit = within_range(limit, 1, 1000, 100)
         params["limit"] = limit
 
         results = []
@@ -2172,7 +1075,7 @@ class Waggle(Nektar):
         params["observer"] = self.username
 
         # custom limits by nektar, hive api limit: 100?
-        limit = _within_range(limit, 1, 100, 100)
+        limit = within_range(limit, 1, 100, 100)
         params["limit"] = limit
 
         results = []
@@ -2304,7 +1207,7 @@ class Waggle(Nektar):
 
         """
 
-        if not _check_wifs(self.roles, "comment"):
+        if not check_wifs(self.roles, "comment"):
             raise NektarException(
                 "The `comment` operation requires"
                 "one of the following private keys:" + ", ".join(ROLES["comment"])
@@ -2357,11 +1260,11 @@ class Waggle(Nektar):
 
         ## initialize transaction data
         ref_block_num, ref_block_prefix = self.get_reference_block_data()
-        expiration = _make_expiration(expire)
-        expire = _within_range(expire, 5, 120, 30)
-        synchronous = _is_boolean(synchronous, False)
-        strict = _is_boolean(strict, True)
-        debug = _is_boolean(debug, False)
+        expiration = make_expiration(expire)
+        expire = within_range(expire, 5, 120, 30)
+        synchronous = is_boolean(synchronous, False)
+        strict = is_boolean(strict, True)
+        debug = is_boolean(debug, False)
 
         operations = [["comment", data]]
         transaction = {
@@ -2404,7 +1307,7 @@ class Waggle(Nektar):
 
         """
 
-        if not _check_wifs(self.roles, "follow"):
+        if not check_wifs(self.roles, "follow"):
             raise NektarException(
                 "The `follow` operation requires"
                 "one of the following private keys:" + ", ".join(ROLES["follow"])
@@ -2460,7 +1363,7 @@ class Waggle(Nektar):
 
         """
 
-        if not _check_wifs(self.roles, "comment"):
+        if not check_wifs(self.roles, "comment"):
             raise NektarException(
                 "The `comment` operation requires"
                 "one of the following private keys:" + ", ".join(ROLES["comment"])
@@ -2480,9 +1383,9 @@ class Waggle(Nektar):
         data["body"] = body
 
         uid = ""
-        edit = _is_boolean(edit, True)
+        edit = is_boolean(edit, True)
         if not edit:
-            uid = _make_expiration(formatting="-%Y%m%d%H%M%S")
+            uid = make_expiration(formatting="-%Y%m%d%H%M%S")
         data["permlink"] = ("re-" + permlink + uid)[:255]
 
         ## create comment metadata
@@ -2498,11 +1401,11 @@ class Waggle(Nektar):
 
         ## initialize transaction data
         ref_block_num, ref_block_prefix = self.get_reference_block_data()
-        expiration = _make_expiration(expire)
-        expire = _within_range(expire, 5, 120, 30)
-        synchronous = _is_boolean(synchronous, False)
-        strict = _is_boolean(strict, True)
-        debug = _is_boolean(debug, False)
+        expiration = make_expiration(expire)
+        expire = within_range(expire, 5, 120, 30)
+        synchronous = is_boolean(synchronous, False)
+        strict = is_boolean(strict, True)
+        debug = is_boolean(debug, False)
 
         operations = [["comment", data]]
         transaction = {
@@ -2632,7 +1535,7 @@ class Waggle(Nektar):
 
         """
 
-        if not _check_wifs(self.roles, "vote"):
+        if not check_wifs(self.roles, "vote"):
             raise NektarException(
                 "The `comment` operation requires"
                 "one of the following private keys:" + ", ".join(ROLES["vote"])
@@ -2651,21 +1554,21 @@ class Waggle(Nektar):
         if not len(match):
             raise NektarException("permlink must be a valid url-escaped string.")
 
-        if _is_boolean(check, False):
+        if is_boolean(check, False):
             if self.voted(author, permlink):
                 return {}
 
         if isinstance(percent, (int, float)):
-            percent = _within_range(percent, -100, 100)
+            percent = within_range(percent, -100, 100)
             weight = 10000 * (percent / 100)
 
         ref_block_num, ref_block_prefix = self.get_reference_block_data()
-        weight = _within_range(weight, -10000, 10000, 10000)
-        expire = _within_range(expire, 5, 120, 30)
-        expiration = _make_expiration(expire)
-        synchronous = _is_boolean(synchronous, False)
-        strict = _is_boolean(strict, True)
-        debug = _is_boolean(debug, False)
+        weight = within_range(weight, -10000, 10000, 10000)
+        expire = within_range(expire, 5, 120, 30)
+        expiration = make_expiration(expire)
+        synchronous = is_boolean(synchronous, False)
+        strict = is_boolean(strict, True)
+        debug = is_boolean(debug, False)
 
         operations = [
             [
@@ -2861,7 +1764,7 @@ class Swarm(Nektar):
             self.version = version
 
         self._community = community
-        _valid_string(community, RE_COMMUNITY)
+        valid_string(community, RE_COMMUNITY)
         self._required_posting_auths = [self.username]
 
     def mute(
@@ -2901,12 +1804,12 @@ class Swarm(Nektar):
 
         """
 
-        _valid_string(author)
-        _valid_string(permlink, RE_PERMLINK)
-        _valid_string(notes)
+        valid_string(author)
+        valid_string(permlink, RE_PERMLINK)
+        valid_string(notes)
 
         operation = ["mutePost", {}]
-        _is_boolean(mute)
+        is_boolean(mute)
         if not mute:
             operation[0] = "unmutePost"
         operation[1] = {
@@ -3108,7 +2011,7 @@ class Swarm(Nektar):
         """
 
         operation = ["subscribe", {"community": self._community}]
-        _is_boolean(subscribe)
+        is_boolean(subscribe)
         if not subscribe:
             operation[0] = "unsubscribe"
 
@@ -3178,9 +2081,9 @@ class Swarm(Nektar):
 
         """
 
-        _valid_string(author)
-        _valid_string(permlink, RE_PERMLINK)
-        _is_boolean(pin)
+        valid_string(author)
+        valid_string(permlink, RE_PERMLINK)
+        is_boolean(pin)
         action = "pinPost"
         if not pin:
             action = "unpinPost"
@@ -3269,9 +2172,9 @@ class Swarm(Nektar):
 
         """
 
-        _valid_string(author)
-        _valid_string(permlink, RE_PERMLINK)
-        _valid_string(notes)
+        valid_string(author)
+        valid_string(permlink, RE_PERMLINK)
+        valid_string(notes)
 
         data = {}
         data["community"] = self._community
@@ -3290,143 +2193,3 @@ class Swarm(Nektar):
             strict=strict,
             debug=debug,
         )
-
-
-##############################
-# utils                      #
-##############################
-
-
-def _check_wifs(roles, operation):
-    """Check if supplied WIF is in the required authority for the specific operation.
-
-    Parameters
-    ----------
-    roles : list
-        list of key authority
-    operation : str
-        operation name
-
-    Returns
-    -------
-        Boolean value.
-    """
-    return bool(len([r for r in ROLES[operation] if r in roles]))
-
-
-def _make_expiration(seconds=30, formatting=None):
-    """Return a UTC datetime formatted for the blockchain.
-
-    Parameters
-    ----------
-    seconds : int
-        seconds to add to the current timestamp (Default is 30)
-    formatting : str, None
-        format of the date-time string
-
-    Returns
-    -------
-    str:
-        Formatted date and time string.
-    """
-    timestamp = time.time() + int(seconds)
-    if formatting is None:
-        formatting = DATETIME_FORMAT
-    _valid_string(formatting)
-    return datetime.utcfromtimestamp(timestamp).strftime(formatting)
-
-def _valid_string(value, pattern=None, fallback=None):
-    """Check if the value is a valid string.
-
-    Parameters
-    ----------
-    value : str
-        value to be tested
-    pattern : str
-        regex pattern
-    fallback : str, None
-        value if failing
-
-    Returns
-    -------
-    str:
-        The value or the fallback.
-    """
-    if not isinstance(value, str):
-        if fallback is None:
-            raise NektarException("The value must be a string.")
-        return fallback
-    if pattern is None:
-        return value
-    if not bool(len(re.findall(pattern, value))):
-        raise NektarException("The value is unsupported.")
-    return value
-
-def _greater_than(value, minimum, fallback=None):
-    """Check if input is greater than, otherwise return fallback.
-
-    Parameters
-    ----------
-    value :
-        value to be tested
-    minimum :
-        value to be tested against
-    fallback :
-        Default is None
-
-    Returns
-    -------
-        The value or the fallback.
-
-    """
-    if not (isinstance(value, int) or rid > minimum):
-        if fallback is None:
-            raise NektarException(f"Value must be an integer greater than {minimum}.")
-        return fallback
-    return value
-
-
-def _within_range(value, minimum, maximum, fallback=None):
-    """Check if input is within the range, otherwise return fallback.
-
-    Parameters
-    ----------
-    value :
-        value to be tested
-    minimum :
-        minimum value of the range
-    maximum :
-        maximum value of the range
-    fallback : integer, None
-        fallback value
-
-    Returns
-    -------
-
-    """
-    if not (isinstance(value, int) and (minimum <= int(value) <= maximum)):
-        if fallback is None:
-            raise NektarException(f"Value must be within {minimum} to {maximum} only.")
-        return fallback
-    return value
-
-def _is_boolean(value, fallback=None):
-    """Check if input is boolean, otherwise return fallback.
-
-    Parameters
-    ----------
-    value :
-        value to be tested
-    fallback : bool, None
-        fallback value
-
-    Returns
-    -------
-        The value or the fallback.
-
-    """
-    if not isinstance(value, bool):
-        if fallback is None:
-            raise NektarException("The value must be `True` or `False` only.")
-        return fallback
-    return value
