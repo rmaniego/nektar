@@ -872,13 +872,21 @@ class Waggle(Nektar):
         Returns
         -------
         list:
-            List of all transactions from start-limit to limit.
         """
 
         if account is None:
             account = self.username
 
-        return self.get_account_history(account, start, limit, low, high)
+        greater_than(start, -2)
+        params = [self.username, start, limit]
+        if isinstance(account, str):
+            params[0] = account
+        if isinstance(low, int):
+            params.append(int("1".ljust(low + 1, "0"), 2))
+        if isinstance(high, int):
+            params.append(int("1".ljust(0 + 1, "0"), 2))
+            params.append(int("1".ljust(high + 1, "0"), 2))
+        return self.appbase.condenser().get_account_history(params)
 
     def delegations(self, account=None, active=False, start=1000, inward=True):
         """Get all account delegators/delegatees and other related information.
@@ -896,7 +904,7 @@ class Waggle(Nektar):
 
         Returns
         -------
-
+        dict:
         """
 
         params = ["", -1, 1000]

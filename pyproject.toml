@@ -1,18 +1,32 @@
-[metadata]
-name = "hive-nektar"
-version = "1.0.1"
-author = "Rodney Maniego Jr."
-author_email = "rodney.maniegojr@gmail.com"
-license = "MIT"
-description = "Nektar, Hive API SDK for Python"
-keywords = "nektar, hive, blockchain, api, sdk"
-url = "https://github.com/rmaniego/nektar"
-download_url = "https://github.com/rmaniego/nektar/archive/v1.0.tar.gz"
-long_description = "file: README.md"
-long_description_content_type = "text/markdown"
-classifiers = [ "Development Status :: 5 - Production/Stable", "Intended Audience :: Developers", "Topic :: Software Development :: Build Tools", "License :: OSI Approved :: MIT License", "Programming Language :: Python :: 3",]
+[build-system]
+requires = ["pdm-pep517"]
+build-backend = "pdm.pep517.api"
 
-[options]
-packages = "nektar"
-install_requires = "ecdsa"
-python_requires = ">=3.9"
+[project]
+name = "hive-nektar"
+version = "1.0.3"
+description = "Nektar, Hive API SDK for Python"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {file = "LICENSE.txt"}
+keywords = ["nektar", "hive", "blockchain", "api", "sdk"]
+authors = [
+    { name="Rodney Maniego Jr." },
+    { email="rodney.maniegojr@gmail.com" }
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Build Tools",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+]
+
+dependencies = [
+  "ecdsa",
+  "requests"
+]
+
+[project.urls]
+homepage = "https://github.com/rmaniego/nektar"
+documentation = "https://nektar.readthedocs.io"
