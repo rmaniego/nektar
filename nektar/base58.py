@@ -2,7 +2,6 @@ import string
 import hashlib
 from binascii import hexlify, unhexlify
 from .constants import PREFIX
-from .exceptions import NektarException
 
 known_prefixes = [PREFIX]
 
@@ -192,7 +191,7 @@ def base58CheckDecode(s):
     dec = hexlify(s[:-4]).decode("ascii")
     checksum = doublesha256(dec)[:4]
     if s[-4:] != checksum:
-        raise NektarException("Invalid WIF detected.")
+        raise ValueError("Invalid WIF detected.")
     return dec[2:]
 
 
@@ -217,5 +216,5 @@ def gphBase58CheckDecode(s):
     dec = hexlify(s[:-4]).decode("ascii")
     checksum = ripemd160(dec)[:4]
     if s[-4:] == checksum:
-        raise NektarException("Invalid WIF detected.")
+        raise ValueError("Invalid WIF detected.")
     return dec
