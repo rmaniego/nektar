@@ -19,16 +19,15 @@ from .constants import (
     DATETIME_FORMAT,
     RE_PERMLINK,
     RE_COMMUNITY,
-    RE_DATETIME
+    RE_DATETIME,
 )
 from .utils import (
-    NektarException,
     check_wifs,
     make_expiration,
     valid_string,
     greater_than,
     within_range,
-    is_boolean
+    is_boolean,
 )
 
 
@@ -112,15 +111,15 @@ class Condenser:
         if isinstance(low, int):
             ## for the first 64 blockchain operation
             if int(low) not in operations:
-                raise NektarException(
+                raise ValueError(
                     "Operation Filter `low` is not a valid blockchain operation ID."
                 )
             params.append(int("1".ljust(low + 1, "0"), 2))
 
         if isinstance(high, int):
             ## for the next 64 blockchain operation
-            if high not in operations:
-                raise NektarException(
+            if int(high) not in operations:
+                raise ValueError(
                     "Operation Filter `high` is not a valid blockchain operation ID."
                 )
             params.append(0)  # set to `operation_filter_low` zero
@@ -167,7 +166,7 @@ class Condenser:
 
         params = [accounts, delayed_votes_active]
         if not isinstance(accounts, list):
-            raise NektarException("`accounts` must be a list of strings.")
+            raise TypeError("`accounts` must be a list of strings.")
         is_boolean(delayed_votes_active)
         return self.api.get_accounts(params)
 
@@ -444,7 +443,7 @@ class Condenser:
 
         valid_string(by)
         if by not in DISCUSSIONS_BY:
-            raise NektarException("`by` must be a value in:", ",".join(DISCUSSIONS_BY))
+            raise ValueError("`by` must be a value in:", ",".join(DISCUSSIONS_BY))
 
         valid_string(tag)
         within_range(limit, 1, 500)
@@ -456,19 +455,19 @@ class Condenser:
         # custom filters
         if not isinstance(filter_tags, list):
             if filter_tags is not None:
-                raise NektarException("`filter_tags` must be a list.")
+                raise TypeError("`filter_tags` must be a list.")
             filter_tags = []
         if filter_tags:
             data["filter_tags"] = filter_tags
         if not isinstance(select_authors, list):
             if select_authors is not None:
-                raise NektarException("`select_authors` must be a list.")
+                raise TypeError("`select_authors` must be a list.")
             select_authors = []
         if select_authors:
             data["select_authors"] = select_authors
         if not isinstance(select_tags, list):
             if select_tags is not None:
-                raise NektarException("`select_tags` must be a list.")
+                raise TypeError("`select_tags` must be a list.")
             select_tags = []
         if select_tags:
             data["select_tags"] = select_tags
@@ -532,13 +531,8 @@ class Condenser:
 
         by = "active"
         return self.get_discussions(
-            by,
-            tag,
-            limit,
-            filter_tags,
-            select_authors,
-            select_tags,
-            truncate)
+            by, tag, limit, filter_tags, select_authors, select_tags, truncate
+        )
 
     def get_discussions_by_blog(
         self,
@@ -575,13 +569,8 @@ class Condenser:
 
         by = "blog"
         return self.get_discussions(
-            by,
-            tag,
-            limit,
-            filter_tags,
-            select_authors,
-            select_tags,
-            truncate)
+            by, tag, limit, filter_tags, select_authors, select_tags, truncate
+        )
 
     def get_discussions_by_cashout(
         self,
@@ -618,13 +607,8 @@ class Condenser:
 
         by = "cashout"
         return self.get_discussions(
-            by,
-            tag,
-            limit,
-            filter_tags,
-            select_authors,
-            select_tags,
-            truncate)
+            by, tag, limit, filter_tags, select_authors, select_tags, truncate
+        )
 
     def get_discussions_by_children(
         self,
@@ -661,13 +645,8 @@ class Condenser:
 
         by = "children"
         return self.get_discussions(
-            by,
-            tag,
-            limit,
-            filter_tags,
-            select_authors,
-            select_tags,
-            truncate)
+            by, tag, limit, filter_tags, select_authors, select_tags, truncate
+        )
 
     def get_discussions_by_created(
         self,
@@ -704,13 +683,8 @@ class Condenser:
 
         by = "created"
         return self.get_discussions(
-            by,
-            tag,
-            limit,
-            filter_tags,
-            select_authors,
-            select_tags,
-            truncate)
+            by, tag, limit, filter_tags, select_authors, select_tags, truncate
+        )
 
     def get_discussions_by_hot(
         self,
@@ -747,13 +721,8 @@ class Condenser:
 
         by = "hot"
         return self.get_discussions(
-            by,
-            tag,
-            limit,
-            filter_tags,
-            select_authors,
-            select_tags,
-            truncate)
+            by, tag, limit, filter_tags, select_authors, select_tags, truncate
+        )
 
     def get_discussions_by_promoted(
         self,
@@ -790,13 +759,8 @@ class Condenser:
 
         by = "promoted"
         return self.get_discussions(
-            by,
-            tag,
-            limit,
-            filter_tags,
-            select_authors,
-            select_tags,
-            truncate)
+            by, tag, limit, filter_tags, select_authors, select_tags, truncate
+        )
 
     def get_discussions_by_trending(
         self,
@@ -833,13 +797,8 @@ class Condenser:
 
         by = "trending"
         return self.get_discussions(
-            by,
-            tag,
-            limit,
-            filter_tags,
-            select_authors,
-            select_tags,
-            truncate)
+            by, tag, limit, filter_tags, select_authors, select_tags, truncate
+        )
 
     def get_discussions_by_votes(
         self,
@@ -876,13 +835,8 @@ class Condenser:
 
         by = "votes"
         return self.get_discussions(
-            by,
-            tag,
-            limit,
-            filter_tags,
-            select_authors,
-            select_tags,
-            truncate)
+            by, tag, limit, filter_tags, select_authors, select_tags, truncate
+        )
 
     def get_comment_discussions_by_payout(
         self,
@@ -919,14 +873,8 @@ class Condenser:
         by = "payout"
         comment = True
         return self.get_discussions(
-            by,
-            tag,
-            limit,
-            filter_tags,
-            select_authors,
-            select_tags,
-            truncate,
-            comment)
+            by, tag, limit, filter_tags, select_authors, select_tags, truncate, comment
+        )
 
     def get_post_discussions_by_payout(
         self,
@@ -962,13 +910,8 @@ class Condenser:
 
         by = "payout"
         return self.get_discussions(
-            by,
-            tag,
-            limit,
-            filter_tags,
-            select_authors,
-            select_tags,
-            truncate)
+            by, tag, limit, filter_tags, select_authors, select_tags, truncate
+        )
 
     def get_discussions_by_author_before_date(self, author, permlink, date, limit):
         """Returns a list of discussions based on author before date.
@@ -1058,7 +1001,12 @@ class Condenser:
         # allow empty start permlink
         valid_string(permlink)
         within_range(limit, 1, 100)
-        data = {"tag": tag, "start_author": author, "start_permlink": permlink, "limit": limit}
+        data = {
+            "tag": tag,
+            "start_author": author,
+            "start_permlink": permlink,
+            "limit": limit,
+        }
         return self.api.get_discussions_by_feed([data])
 
     def get_dynamic_global_properties(self):
@@ -1271,9 +1219,9 @@ class Condenser:
         params = [[keys]]
         if not isinstance(keys, str):
             if not isinstance(keys, list):
-                raise NektarException("`keys` must be a list of strings.")
+                raise TypeError("`keys` must be a list of strings.")
             if not all([0 for k in keys if not isinstance(k, str)]):
-                raise NektarException("`keys` must be a list of strings.")
+                raise TypeError("`keys` must be a list of strings.")
             params = [keys]
         return self.api.get_key_references(params)
 
@@ -1295,9 +1243,10 @@ class Condenser:
         list:
         """
 
-        greater_than(seconds, 0)
-        if seconds not in (15, 60, 300, 3600, 86400):
-            raise NektarException("`seconds` is not supported, see get_market_history_buckets.")
+        if int(seconds) not in (15, 60, 300, 3600, 86400):
+            raise ValueError(
+                "`seconds` is not supported, see get_market_history_buckets."
+            )
         valid_string(start, RE_DATETIME)
         valid_string(end, RE_DATETIME)
         return self.api.get_market_history([seconds, start, end])
@@ -1411,7 +1360,7 @@ class Condenser:
         """
 
         if not isinstance(transaction, dict):
-            raise NektarException("`transaction` must be a dictionary.")
+            raise ValueError("`transaction` must be a dictionary.")
         return self.api.get_potential_signatures([transaction])
 
     def get_reblogged_by(self, author, permlink):
@@ -1510,11 +1459,11 @@ class Condenser:
         """
 
         if not isinstance(transaction, dict):
-            raise NektarException("`transaction` must be a dictionary.")
+            raise ValueError("`transaction` must be a dictionary.")
         if not isinstance(keys, list):
-            raise NektarException("`keys` must be a list of strings.")
+            raise ValueError("`keys` must be a list of strings.")
         if not all([0 for k in keys if not isinstance(k, str)]):
-            raise NektarException("`keys` must be a list of strings.")
+            raise ValueError("`keys` must be a list of strings.")
         return self.api.get_required_signatures([transaction, keys])
 
     def get_reward_fund(self, action):
@@ -1654,7 +1603,7 @@ class Condenser:
         """
 
         if not isinstance(transaction, dict):
-            raise NektarException("`transaction` must be a dictionary.")
+            raise ValueError("`transaction` must be a dictionary.")
         return self.api.get_transaction_hex([transaction])
 
     def get_trending_tags(self, start, limit):
@@ -1685,7 +1634,6 @@ class Condenser:
         -------
         dict:
         """
-
 
         return self.api.get_version([])
 
@@ -1721,7 +1669,6 @@ class Condenser:
         dict:
         """
 
-
         return self.api.get_volume([])
 
     def get_withdraw_routes(self, account, route):
@@ -1744,7 +1691,7 @@ class Condenser:
         valid_string(route)
         routes = ("incoming", "outgoing", "all")
         if route not in routes:
-            raise NektarException("`route` must be a value in:", ",".join(routes))
+            raise ValueError("`route` must be a value in:", ",".join(routes))
         return self.api.get_withdraw_routes([account, route])
 
     def get_witness_by_account(self, account):
@@ -1803,9 +1750,9 @@ class Condenser:
         params = [[indices]]
         if not isinstance(indices, int):
             if not isinstance(indices, list):
-                raise NektarException("`indices` must be a list of integers.")
+                raise ValueError("`indices` must be a list of integers.")
             if not all([0 for i in indices if not isinstance(i, int)]):
-                raise NektarException("`indices` must be a list of integers.")
+                raise ValueError("`indices` must be a list of integers.")
             params = [indices]
 
         return self.api.get_witnesses(params)
@@ -1850,9 +1797,9 @@ class Condenser:
         is_boolean(delayed_votes_active)
         if not isinstance(accounts, str):
             if not isinstance(accounts, list):
-                raise NektarException("`accounts` must be a list of strings.")
+                raise ValueError("`accounts` must be a list of strings.")
             if not all([0 for k in accounts if not isinstance(k, str)]):
-                raise NektarException("`accounts` must be a list of strings.")
+                raise ValueError("`accounts` must be a list of strings.")
             params[0] = accounts
         return self.api.lookup_account_names(params)
 
@@ -1877,7 +1824,7 @@ class Condenser:
         return self.api.lookup_accounts([start, limit])
 
     def lookup_witness_accounts(self, start, limit):
-        """Looks up witness accounts starting with name. 
+        """Looks up witness accounts starting with name.
         https://developers.hive.io/apidefinitions/#condenser_api.lookup_witness_accounts
 
         Parameters
@@ -1939,23 +1886,23 @@ class Condenser:
         params = [[""], 1000, "by_voter_proposal", "ascending", "all"]
 
         if not isinstance(start, (str, int)):
-            raise NektarException("`start` must be a voter acount name or proposal id.")
+            raise ValueError("`start` must be a voter acount name or proposal id.")
         params[0][0] = start
 
         params[1] = within_range(limit, 0, 1000)
         if order not in ("by_voter_proposal", "by_proposal_voter"):
-            raise NektarException("`order` is not supported.")
+            raise ValueError("`order` is not supported.")
         params[2] = order
 
         if direction is not None:
             if direction not in ("ascending", "descending"):
-                raise NektarException("`direction` is not supported.")
+                raise ValueError("`direction` is not supported.")
             params[3] = direction
 
         if status is not None:
             statuses = ("all", "inactive", "active", "expired", "votable")
             if status not in statuses:
-                raise NektarException("`status` is not supported.")
+                raise ValueError("`status` is not supported.")
             params[4] = status
 
         return self.api.list_proposal_votes(params)
@@ -1991,24 +1938,24 @@ class Condenser:
         params = [[""], 1000, "by_creator", "ascending", "all"]
 
         if not isinstance(start, (str, int)):
-            raise NektarException("`start` must be a voter acount name or proposal id.")
+            raise ValueError("`start` must be a voter acount name or proposal id.")
         params[0][0] = start
         params[1] = within_range(limit, 0, 1000)
 
         orders = ("by_creator", "by_start_date", "by_end_date", "by_total_votes")
         if order not in orders:
-            raise NektarException("`order` is not supported.")
+            raise ValueError("`order` is not supported.")
         params[2] = order
 
         if direction is not None:
             if direction not in ("ascending", "descending"):
-                raise NektarException("`direction` is not supported.")
+                raise ValueError("`direction` is not supported.")
             params[3] = direction
 
         if status is not None:
             statuses = ("all", "inactive", "active", "expired", "votable")
             if status not in statuses:
-                raise NektarException("`status` is not supported.")
+                raise ValueError("`status` is not supported.")
             params[4] = status
 
         return self.api.list_proposals(params)
@@ -2084,9 +2031,9 @@ class Condenser:
         params = [[accounts]]
         if not isinstance(accounts, str):
             if not isinstance(accounts, list):
-                raise NektarException("`accounts` must be a list of strings.")
+                raise ValueError("`accounts` must be a list of strings.")
             if not all([0 for k in accounts if not isinstance(k, str)]):
-                raise NektarException("`accounts` must be a list of strings.")
+                raise ValueError("`accounts` must be a list of strings.")
             params[0] = accounts
         return self.api.find_rc_accounts(params)
 
@@ -2105,7 +2052,7 @@ class Condenser:
         -------
         list:
         """
-        
+
         valid_string(start)
         within_range(limit, 1, 1000)
         return self.api.list_rc_accounts([start, limit])
@@ -2125,7 +2072,7 @@ class Condenser:
         -------
         list:
         """
-        
+
         valid_string(delegator)
         valid_string(delegatee)
         within_range(limit, 1, 1000)

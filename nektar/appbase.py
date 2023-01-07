@@ -20,7 +20,6 @@ from requests.packages.urllib3.util.retry import Retry
 
 from .transactions import sign_transaction
 from .constants import NEKTAR_VERSION, NODES, APPBASE_API, BLOCKCHAIN_OPERATIONS, ROLES
-from .exceptions import NektarException
 
 
 class AppBase:
@@ -294,7 +293,7 @@ class AppBase:
         :param debug:  (Default value = False)
 
         """
-        
+
         if not isinstance(self.chain_id, str):
             self.chain_id = self.api("database").get_version({})["chain_id"]
 
@@ -324,14 +323,18 @@ class AppBase:
         ## update transaction signature
         self.signed_transaction = transaction
         wifs = _get_necessary_wifs(self.wifs, operation)
-        self.signed_transaction["signatures"] = sign_transaction(self.chain_id, serialized_transaction, wifs)
-        
+        self.signed_transaction["signatures"] = sign_transaction(
+            self.chain_id, serialized_transaction, wifs
+        )
+
         if strict:
             verified = self.api("condenser").verify_authority(self.signed_transaction)
             if not (not debug and verified):
-                raise NektarException("Transaction does not contain required signatures.")
+                raise NektarException(
+                    "Transaction does not contain required signatures."
+                )
             if debug:
-               return verified
+                return verified
 
         self.rid += 1
         payload = _format_payload(method, [self.signed_transaction], self.rid)
@@ -367,7 +370,7 @@ class AppBase:
                     f"Node '{node}' is unavailable, retrying with the next node."
                 )
         if strict and ("error" in data):
-            raise NektarException(data["error"].get("message"))
+            raise SystemError(data["error"].get("message"))
         return data.get("result", {})
 
 

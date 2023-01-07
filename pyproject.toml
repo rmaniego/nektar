@@ -4,11 +4,11 @@ build-backend = "pdm.pep517.api"
 
 [project]
 name = "hive-nektar"
-version = "1.0.3"
+version = "1.0.4"
 description = "Nektar, Hive API SDK for Python"
 readme = "README.md"
 requires-python = ">=3.10"
-license = {file = "LICENSE.txt"}
+license = "LICENSE.txt"
 keywords = ["nektar", "hive", "blockchain", "api", "sdk"]
 authors = [
     { name="Rodney Maniego Jr." },

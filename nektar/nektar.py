@@ -21,16 +21,15 @@ from .constants import (
     BLOCKCHAIN_OPERATIONS,
     ASSETS,
     ROLES,
-    DATETIME_FORMAT
+    DATETIME_FORMAT,
 )
 from .utils import (
-    NektarException,
     check_wifs,
     make_expiration,
     valid_string,
     greater_than,
     within_range,
-    is_boolean
+    is_boolean,
 )
 
 
@@ -102,11 +101,11 @@ class Nektar:
         """
 
         if not isinstance(username, str):
-            raise NektarException("`username` must be a valid Hive account username.")
+            raise TypeError("`username` must be a valid Hive account username.")
         self.username = username
         if wifs is not None:
             if not isinstance(wifs, dict):
-                raise NektarException("`wifs` must be a valid WIF dictionary.")
+                raise TypeError("`wifs` must be a valid WIF dictionary.")
             self.appbase.append_wif(wifs)
             self.roles = list(self.appbase.wifs.keys())
 
@@ -149,10 +148,10 @@ class Nektar:
         if account is None:
             account = self.username
         if not isinstance(account, str):
-            raise NektarException("Account must be a string.")
+            raise TypeError("`account` must be a string.")
         pattern = r"[\w][\w\d\.\-]{2,15}"
         if not len(re.findall(pattern, account)):
-            raise NektarException("Account must be a string of length 3 - 16.")
+            raise ValueError("`account` must be a string of length 3 - 16.")
         params["accounts"] = [account]
 
         data = self.appbase.rc().find_rc_accounts(params)["rc_accounts"]
@@ -194,9 +193,7 @@ class Nektar:
         if account:
             data = self.appbase.condenser().get_accounts([[account]])
             if not data:
-                raise NektarException(
-                    "`account` must be a valid Hive account username."
-                )
+                raise ValueError("`account` must be a valid Hive account username.")
             value = int(data[0]["reputation"])
         if not score:
             return value
@@ -347,9 +344,7 @@ class Nektar:
         role = "posting"  # initial required role
 
         if not isinstance(required_auths, list):
-            raise NektarException(
-                "The `required_auths` requires a list of valid usernames."
-            )
+            raise TypeError("The `required_auths` requires a list of valid usernames.")
         data["required_auths"] = required_auths
 
         # if required auths is not empty, include owner,
@@ -357,25 +352,25 @@ class Nektar:
         if len(required_auths):
             role = "custom_json"
         if not check_wifs(self.roles, role):
-            raise NektarException(
+            raise ValueError(
                 "The `custom_json` operation requires"
                 "one of the following private keys:" + ", ".join(ROLES[role])
             )
 
         if not isinstance(required_posting_auths, list):
-            raise NektarException(
+            raise TypeError(
                 "The `required_posting_auths` requires a list of valid usernames."
             )
         data["required_posting_auths"] = required_posting_auths
 
         if len(re.findall(r"[^\w\-]+", id_)):
-            raise NektarException(
+            raise ValueError(
                 "Custom JSON id must be a valid string preferrably in lowercase and (snake_case or kebab-case) format."
             )
         data["id"] = id_
 
         if not isinstance(jdata, (list, dict)):
-            raise NektarException("Custom JSON must be in dictionary format.")
+            raise TypeError("Custom JSON must be in dictionary format.")
         data["json"] = json.dumps(jdata).replace("'", '\\"')
 
         ref_block_num, ref_block_prefix = self.get_reference_block_data()
@@ -435,16 +430,16 @@ class Nektar:
 
         asset = asset.upper()
         if asset not in ("HBD", "HIVE"):
-            raise NektarException("Memo only accepts transfer of HBD and HIVE assets.")
+            raise ValueError("Memo only accepts transfer of HBD and HIVE assets.")
 
         operations = [["transfer", {}]]
         if to is not None:
             if to not in ("savings", "vesting"):
-                raise NektarException(
+                raise ValueError(
                     "Value of `to` must be `None`, `savings`, or `vesting` only."
                 )
             if to == "vesting" and asset != "HIVE":
-                raise NektarException(
+                raise ValueError(
                     "Transfer to vesting only accepts transfer of HIVE asset only."
                 )
             operations[0][0] = "transfer_to_" + to
@@ -452,15 +447,15 @@ class Nektar:
         data = {}
         data["from"] = self.username
         if not isinstance(receiver, str):
-            raise NektarException("Receiver must be a valid Hive account user.")
+            raise ValueError("Receiver must be a valid Hive account user.")
         if to is None and (self.username == receiver):
-            raise NektarException("Receiver must be unique from the sender.")
+            raise ValueError("Receiver must be unique from the sender.")
         data["to"] = receiver
 
         if not isinstance(amount, (int, float)):
-            raise NektarException("Amount must be a positive numeric value.")
+            raise TypeError("Amount must be a positive numeric value.")
         if amount < 0.001:
-            raise NektarException("Amount must be a positive numeric value.")
+            raise TypeError("Amount must be a positive numeric value.")
 
         precision = ASSETS[asset]["precision"]
         whole, fraction = str(float(amount)).split(".")
@@ -469,9 +464,9 @@ class Nektar:
 
         if to != "vesting":
             if not isinstance(message, str):
-                raise NektarException("Memo message must be a UTF-8 string.")
+                raise TypeError("Memo message must be a UTF-8 string.")
             if not (len(message.encode("utf-8")) <= 2048):
-                raise NektarException("Memo message must be not more than 2048 bytes.")
+                raise ValueError("Memo message must be not more than 2048 bytes.")
             data["memo"] = message
         operations[0][1] = data
 
@@ -728,9 +723,7 @@ class Waggle(Nektar):
         if isinstance(community, str):
             match = re.findall(r"\bhive-[\d]{1,6}\b", community)
             if not len(match):
-                raise NektarException(
-                    f"Community name '{community}' format is unsupported."
-                )
+                raise ValueError(f"Community name '{community}' format is unsupported.")
 
         # custom limits by nektar, hive api limit: 100
         custom_limit = within_range(limit, 1, 10000, 100)
@@ -1109,19 +1102,19 @@ class Waggle(Nektar):
 
         params = {}
         if not isinstance(author, str):
-            raise NektarException("Author must be a string.")
+            raise TypeError("Author must be a string.")
         pattern = r"[\w][\w\d\.\-]{2,15}"
         if not len(re.findall(pattern, author)):
-            raise NektarException("author must be a string of length 3 - 16.")
+            raise ValueError("author must be a string of length 3 - 16.")
         params["author"] = author
         pattern = r"[\w][\w\d\-\%]{0,255}"
         if not len(re.findall(pattern, permlink)):
-            raise NektarException("permlink must be a valid url-escaped string.")
+            raise ValueError("permlink must be a valid url-escaped string.")
         params["permlink"] = permlink
         params["observer"] = self.username
 
         if not (1 <= int(retries) <= 5):
-            raise NektarException("Retries must be between 1 to 5 times.")
+            raise ValueError("Retries must be between 1 to 5 times.")
         strict = retries == 1
 
         for _ in range(retries):
@@ -1149,18 +1142,18 @@ class Waggle(Nektar):
 
         params = ["", ""]
         if not isinstance(author, str):
-            raise NektarException("Author must be a string.")
+            raise TypeError("Author must be a string.")
         pattern = r"[\w][\w\.\-]{2,15}"
         if not len(re.findall(pattern, author)):
-            raise NektarException("author must be a string of length 3 - 16.")
+            raise ValueError("author must be a string of length 3 - 16.")
         params[0] = author
         pattern = r"[\w][\w\-\%]{0,255}"
         if not len(re.findall(pattern, permlink)):
-            raise NektarException("permlink must be a valid url-escaped string.")
+            raise ValueError("permlink must be a valid url-escaped string.")
         params[1] = permlink
 
         if not (1 <= int(retries) <= 5):
-            raise NektarException("Retries must be between 1 to 5 times.")
+            raise ValueError("Retries must be between 1 to 5 times.")
         strict = retries == 1
 
         for _ in range(retries):
@@ -1210,7 +1203,7 @@ class Waggle(Nektar):
         """
 
         if not check_wifs(self.roles, "comment"):
-            raise NektarException(
+            raise ValueError(
                 "The `comment` operation requires"
                 "one of the following private keys:" + ", ".join(ROLES["comment"])
             )
@@ -1220,13 +1213,13 @@ class Waggle(Nektar):
 
         title = re.sub(r"[\r\n]", "", title)
         if not (1 <= len(title.encode("utf-8")) <= 256):
-            raise NektarException("Title must be within 1 to 256 bytes.")
+            raise ValueError("Title must be within 1 to 256 bytes.")
         data["title"] = title
 
         if not isinstance(body, str):
-            raise NektarException("Body must be a UTF-8 string.")
+            raise TypeError("Body must be a UTF-8 string.")
         if not len(body.encode("utf-8")):
-            raise NektarException("Body must be at least 1 byte.")
+            raise ValueError("Body must be at least 1 byte.")
         data["body"] = body
 
         permlink = re.sub(r"[^\w\ ]", "", title.lower())
@@ -1238,7 +1231,7 @@ class Waggle(Nektar):
         data["parent_permlink"] = ""
         if isinstance(community, str):
             if not len(re.findall(r"hive-[\d]{1,}", community)):
-                raise NektarException("Community name must follow `hive-*` format.")
+                raise ValueError("Community name must follow `hive-*` format.")
             data["parent_permlink"] = community
 
         ## create blog metadata
@@ -1310,7 +1303,7 @@ class Waggle(Nektar):
         """
 
         if not check_wifs(self.roles, "follow"):
-            raise NektarException(
+            raise ValueError(
                 "The `follow` operation requires"
                 "one of the following private keys:" + ", ".join(ROLES["follow"])
             )
@@ -1366,7 +1359,7 @@ class Waggle(Nektar):
         """
 
         if not check_wifs(self.roles, "comment"):
-            raise NektarException(
+            raise ValueError(
                 "The `comment` operation requires"
                 "one of the following private keys:" + ", ".join(ROLES["comment"])
             )
@@ -1379,9 +1372,9 @@ class Waggle(Nektar):
         data["parent_permlink"] = permlink
 
         if not isinstance(body, str):
-            raise NektarException("Body must be a UTF-8 string.")
+            raise TypeError("Body must be a UTF-8 string.")
         if not len(body.encode("utf-8")):
-            raise NektarException("Body must be at least 1 byte.")
+            raise ValueError("Body must be at least 1 byte.")
         data["body"] = body
 
         uid = ""
@@ -1438,18 +1431,18 @@ class Waggle(Nektar):
 
         params = ["", ""]
         if not isinstance(author, str):
-            raise NektarException("Author must be a string.")
+            raise TypeError("Author must be a string.")
         pattern = r"[\w][\w\.\-]{2,15}"
         if not len(re.findall(pattern, author)):
-            raise NektarException("author must be a string of length 3 - 16.")
+            raise ValueError("author must be a string of length 3 - 16.")
         params[0] = author
         pattern = r"[\w][\w\-\%]{0,255}"
         if not len(re.findall(pattern, permlink)):
-            raise NektarException("permlink must be a valid url-escaped string.")
+            raise ValueError("permlink must be a valid url-escaped string.")
         params[1] = permlink
 
         if not (1 <= int(retries) <= 5):
-            raise NektarException("Retries must be between 1 to 5 times.")
+            raise ValueError("Retries must be between 1 to 5 times.")
         strict = retries == 1
 
         for _ in range(retries):
@@ -1477,18 +1470,18 @@ class Waggle(Nektar):
 
         params = ["", ""]
         if not isinstance(author, str):
-            raise NektarException("Author must be a string.")
+            raise TypeError("Author must be a string.")
         pattern = r"[\w][\w\.\-]{2,15}"
         if not len(re.findall(pattern, author)):
-            raise NektarException("author must be a string of length 3 - 16.")
+            raise ValueError("author must be a string of length 3 - 16.")
         params[0] = author
         pattern = r"[\w][\w\-\%]{0,255}"
         if not len(re.findall(pattern, permlink)):
-            raise NektarException("permlink must be a valid url-escaped string.")
+            raise ValueError("permlink must be a valid url-escaped string.")
         params[1] = permlink
 
         if not (1 <= int(retries) <= 5):
-            raise NektarException("Retries must be between 1 to 5 times.")
+            raise ValueError("Retries must be between 1 to 5 times.")
         strict = retries == 1
 
         for _ in range(retries):
@@ -1538,23 +1531,23 @@ class Waggle(Nektar):
         """
 
         if not check_wifs(self.roles, "vote"):
-            raise NektarException(
+            raise ValueError(
                 "The `comment` operation requires"
                 "one of the following private keys:" + ", ".join(ROLES["vote"])
             )
 
         if not isinstance(author, str):
-            raise NektarException("Author must be a string.")
+            raise TypeError("Author must be a string.")
 
         pattern = r"[\w][\w\d\.\-]{2,15}"
         match = re.findall(pattern, author)
         if not len(match):
-            raise NektarException("author must be a string of length 3 - 16.")
+            raise ValueError("author must be a string of length 3 - 16.")
 
         pattern = r"[\w][\w\d\-\%]{0,255}"
         match = re.findall(pattern, permlink)
         if not len(match):
-            raise NektarException("permlink must be a valid url-escaped string.")
+            raise ValueError("permlink must be a valid url-escaped string.")
 
         if is_boolean(check, False):
             if self.voted(author, permlink):
@@ -1611,18 +1604,18 @@ class Waggle(Nektar):
 
         params = ["", ""]
         if not isinstance(author, str):
-            raise NektarException("Author must be a string.")
+            raise TypeError("Author must be a string.")
         pattern = r"[\w][\w\.\-]{2,15}"
         if not len(re.findall(pattern, author)):
-            raise NektarException("author must be a string of length 3 - 16.")
+            raise ValueError("author must be a string of length 3 - 16.")
         params[0] = author
         pattern = r"[\w][\w\-\%]{0,255}"
         if not len(re.findall(pattern, permlink)):
-            raise NektarException("permlink must be a valid url-escaped string.")
+            raise ValueError("permlink must be a valid url-escaped string.")
         params[1] = permlink
 
         if not (1 <= int(retries) <= 5):
-            raise NektarException("Retries must be between 1 to 5 times.")
+            raise ValueError("Retries must be between 1 to 5 times.")
         strict = retries == 1
 
         for _ in range(retries):
@@ -1938,20 +1931,24 @@ class Swarm(Nektar):
 
         title = re.sub(r"[\r\n]", "", title)
         if not (1 <= len(title.encode("utf-8")) <= 20):
-            raise NektarException("`title` parameter must be a string.")
+            raise ValueError("`title` parameter must be a string of length 1 to 20.")
 
         about = re.sub(r"[\r\n]", "", about)
         if not (0 <= len(about.encode("utf-8")) <= 120):
-            raise NektarException("`about` parameter must be a string.")
+            raise ValueError("`about` parameter must be a string of length 0 to 120.")
 
         if not isinstance(is_nsfw, bool):
-            raise NektarException("`is_nsfw` must be either `True` or `False` only.")
+            raise TypeError("`is_nsfw` must be either `True` or `False` only.")
 
         if not (0 <= len(description.encode("utf-8")) <= 1000):
-            raise NektarException("`description` parameter must be a string.")
+            raise ValueError(
+                "`description` parameter must be a string of length 0 to 1000."
+            )
 
         if not (0 <= len(flag_text.encode("utf-8")) <= 1000):
-            raise NektarException("`flag_text` parameter must be a string.")
+            raise ValueError(
+                "`flag_text` parameter must be a string of length 0 to 1000."
+            )
 
         data = {}
         data["required_auths"] = []
