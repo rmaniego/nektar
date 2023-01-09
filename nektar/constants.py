@@ -13,7 +13,9 @@
     :license: MIT License
 """
 
-NEKTAR_VERSION = "0.10.2"
+import re
+
+NEKTAR_VERSION = "1.1.0"
 
 # PublicKey prefix
 PREFIX = "STM"
@@ -364,6 +366,14 @@ NODES = [
     # "api.pharesim.me",
 ]
 
-RE_PERMLINK = r"[\w][\w\d\-\%]{0,255}"
-RE_COMMUNITY = r"\bhive-[\d]{1,6}\b"
-RE_DATETIME = r"\d{4}\-\d{2}\-\d{2}T\d{2}:\d{2}:\d{2}"
+        
+RE_PROTOCOL = re.compile(r"http[s]{0,1}\:[\/]{2}")
+RE_URL_PATH = re.compile(r"[\/][\w\W]+")
+RE_USERNAME = re.compile(r"[a-z][\w\.\-]{2,15}")
+RE_SNAKE_CASE = re.compile(r"[^\w\-]+")
+RE_PERMLINK = re.compile(r"[\w\-\%]{0,255}")
+RE_COMMUNITY = re.compile(r"\bhive-[\d]{1,}")
+RE_DATETIME = re.compile(r"\d{4}\-\d{2}\-\d{2}T\d{2}:\d{2}:\d{2}")
+RE_NEWLINES = re.compile(r"[\r\n]")
+RE_WORDS = re.compile(r"[^\w\ ]")
+RE_IMAGES = re.compile(r"!\[[^\]]*\]\([^\)]+\)")

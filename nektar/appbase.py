@@ -9,17 +9,26 @@
     :license: MIT License
 """
 
-import re
 import json
 import hashlib
 import requests
 import warnings
+from re import sub
 from binascii import hexlify, unhexlify
 from requests.adapters import HTTPAdapter
 from requests.packages.urllib3.util.retry import Retry
 
+from .mock import mock_server
 from .transactions import sign_transaction
-from .constants import NEKTAR_VERSION, NODES, APPBASE_API, BLOCKCHAIN_OPERATIONS, ROLES
+from .constants import (
+    NEKTAR_VERSION,
+    NODES,
+    APPBASE_API,
+    BLOCKCHAIN_OPERATIONS,
+    ROLES,
+    RE_PROTOCOL,
+    RE_URL_PATH,
+)
 
 
 class AppBase:
@@ -44,7 +53,7 @@ class AppBase:
         self.rid = 0
 
         if not isinstance(warning, bool):
-            raise NektarException("Warning must be `True` or `False` only.")
+            raise TypeError("Warning must be `True` or `False` only.")
         if not warning:
             warnings.filterwarnings(
                 "ignore",
@@ -61,14 +70,13 @@ class AppBase:
 
         # initialize session
         self.session = requests.Session()
-        max_retries = Retry(
+        self.session.mount("http://", HTTPAdapter(max_retries=Retry(
             total=self.retries, backoff_factor=0.5, status_forcelist=[502, 503, 504]
-        )
-        self.session.mount("http://", HTTPAdapter(max_retries=max_retries))
-        self.headers = {
+        )))
+        self.session.headers.update({
             "User-Agent": f"Nektar v{NEKTAR_VERSION}",
             "content-type": "application/json; charset=utf-8",
-        }
+        })
 
         self.nodes = NODES
         self.custom_nodes(nodes)
@@ -89,11 +97,12 @@ class AppBase:
         if isinstance(nodes, str):
             nodes = [nodes]
         self.node = []
+
         for node in list(nodes):
-            node = re.sub(r"http[s]{0,1}\:[\/]{2}", "", node)
-            node = re.sub(r"[\/][\w\W]+", "", node)
+            node = RE_PROTOCOL.sub("", node)
+            node = RE_URL_PATH.sub("", node)
             if not len(node):
-                raise NektarException("Invalid node format.")
+                raise TypeError("Invalid node format.")
             self.nodes.append(node)
 
     def append_wif(self, wif, role=None):
@@ -110,9 +119,9 @@ class AppBase:
                 self.append_wif(w, r)
             return
         if not isinstance(wif, str) and not isinstance(role, str):
-            raise NektarException("Role and WIF must be a valid string.")
+            raise TypeError("Role and WIF must be a valid string.")
         if role not in ROLES["all"]:
-            raise NektarException(
+            raise ValueError(
                 "Role must be `owner`, `active`, `posting`, or `memo` only."
             )
         if wif not in list(self.wifs.values()):
@@ -151,7 +160,7 @@ class AppBase:
             if name not in ("bridge",):
                 name += "_api"
         if name not in APPBASE_API:
-            raise NektarException(name + " is unsupported.")
+            raise ValueError(name + " is unsupported.")
         self._appbase_api = name
         return self
 
@@ -185,9 +194,9 @@ class AppBase:
         self._appbase_api = "database_api"
         return self
 
-    def debug_node(self):
-        """Set the active API to `debug_node_api`."""
-        self._appbase_api = "debug_node_api"
+    def mock_node(self):
+        """Set the active API to `mock_node_api`."""
+        self._appbase_api = "mock_node_api"
         return self
 
     def follow(self):
@@ -237,8 +246,8 @@ class AppBase:
         """
         method = args[0]
         if method not in APPBASE_API[self._appbase_api]:
-            raise NektarException(name + " is unsupported.")
-        method = self._appbase_api + "." + method
+            raise ValueError(f"{name} is unsupported.")
+        method = f"{self._appbase_api}.{method}"
 
         params = []
         if len(args) > 1:
@@ -251,6 +260,11 @@ class AppBase:
         strict = True
         if "strict" in kwargs:
             strict = kwargs["strict"]
+
+        # use mock server or not
+        mock = False
+        if "mock" in kwargs:
+            mock = kwargs["mock"]
 
         ## do not change sorting order !!
         broadcast_methods = [
@@ -270,10 +284,10 @@ class AppBase:
                 params = {"trx": params[0]}
 
         if method in broadcast_methods[1:]:
-            return self.broadcast(method, params, strict=strict)
-        return self.request(method, params, strict=strict)
+            return self.broadcast(method, params, strict=strict, mock=mock)
+        return self.request(method, params, strict=strict, mock=mock)
 
-    def request(self, method, params, strict=True):
+    def request(self, method, params, strict=True, mock=False):
         """Send predefined params as JSON-RPC request.
 
         :param method:
@@ -282,15 +296,15 @@ class AppBase:
         """
         self.rid += 1
         payload = _format_payload(method, params, self.rid)
-        return self._send_request(payload, strict=strict)
+        return self._send_request(payload, strict=strict, mock=mock)
 
-    def broadcast(self, method, transaction, strict=True, debug=False):
+    def broadcast(self, method, transaction, strict=True, mock=False):
         """Broadcast a transaction to the blockchain.
 
         :param method:
         :param transaction:
         :param strict:  (Default value = True)
-        :param debug:  (Default value = False)
+        :param mock:  (Default value = False)
 
         """
 
@@ -301,7 +315,7 @@ class AppBase:
         operation = ""
         for op in transaction["operations"]:
             if op[0] not in BLOCKCHAIN_OPERATIONS:
-                raise NektarException(op[0] + " is unsupported")
+                raise ValueError(op[0] + " is unsupported")
             operation = op[0]
             # avoid unnecessary signatures
             if operation == "custom_json":
@@ -329,16 +343,12 @@ class AppBase:
 
         if strict:
             verified = self.api("condenser").verify_authority(self.signed_transaction)
-            if not (not debug and verified):
-                raise NektarException(
-                    "Transaction does not contain required signatures."
-                )
-            if debug:
-                return verified
+            if not verified:
+                raise ValueError("Transaction does not contain required signatures.")
 
         self.rid += 1
         payload = _format_payload(method, [self.signed_transaction], self.rid)
-        return self._send_request(payload, strict)
+        return self._send_request(payload, strict, mock)
 
     def _serialize(self, transaction):
         """Get a hexdump of the serialized binary form of a transaction.
@@ -348,19 +358,22 @@ class AppBase:
         """
         return self.api("condenser").get_transaction_hex([transaction])
 
-    def _send_request(self, payload, strict=True):
+    def _send_request(self, payload, strict=True, mock=False):
         """Send an API request with a valid payload, as defined by the Hive API documentation.
 
         :param payload: a formatted and valid payload.
         :param strict: flag to cause exception upon encountering an error (Default value = True)
 
         """
+        if mock:
+            return mock_server(payload)
+        
+        # send request to next node when failing
         data = {}
         for node in self.nodes:
             try:
-                url = "https://" + node
                 response = self.session.post(
-                    url, headers=self.headers, json=payload, timeout=self.timeout
+                    f"https://{node}", json=payload, timeout=self.timeout
                 )
                 response.raise_for_status()
                 data = json.loads(response.content.decode("utf-8"))
@@ -397,7 +410,7 @@ def _format_payload(method, params, rid):
 
     :param method: the API method
     :param params: the required parameters to successfully perform the operation or request
-    :param rid: the unique RPC id used for debugging purposes
+    :param rid: the unique RPC id used for mockging purposes
 
     """
     return {"jsonrpc": "2.0", "method": method, "params": params, "id": rid}

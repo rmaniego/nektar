@@ -9,7 +9,6 @@
     :license: MIT License
 """
 
-import re
 import json
 import math
 import struct
@@ -22,6 +21,13 @@ from .constants import (
     ASSETS,
     ROLES,
     DATETIME_FORMAT,
+    RE_USERNAME,
+    RE_SNAKE_CASE,
+    RE_COMMUNITY,
+    RE_NEWLINES,
+    RE_PERMLINK,
+    RE_WORDS,
+    RE_IMAGES,
 )
 from .utils import (
     check_wifs,
@@ -31,7 +37,6 @@ from .utils import (
     within_range,
     is_boolean,
 )
-
 
 class Nektar:
     """Nektar base class.
@@ -78,6 +83,7 @@ class Nektar:
             retries=retries,
             warning=warning,
         )
+        self.roles = []
         self.set_username(username, wifs)
 
         self.account = None
@@ -149,8 +155,7 @@ class Nektar:
             account = self.username
         if not isinstance(account, str):
             raise TypeError("`account` must be a string.")
-        pattern = r"[\w][\w\d\.\-]{2,15}"
-        if not len(re.findall(pattern, account)):
+        if not len(RE_USERNAME.findall(account)):
             raise ValueError("`account` must be a string of length 3 - 16.")
         params["accounts"] = [account]
 
@@ -263,21 +268,23 @@ class Nektar:
         ref_block_prefix = struct.unpack_from("<I", unhexlify(previous), 4)[0]
         return ref_block_num, ref_block_prefix
 
-    def verify_authority(self, transaction):
+    def verify_authority(self, transaction, mock=False):
         """Returns true if the transaction has all of the required signatures.
 
         Parameters
         ----------
         transaction :
             a valid transaction data
+        mock : bool, optional
+            flag to disable completion of the broadcast operation (Default is False)
 
         Returns
         -------
 
         """
-        return self.appbase.condenser().verify_authority(transaction, strict=False)
+        return self.appbase.condenser().verify_authority(transaction, strict=False, mock=mock)
 
-    def _broadcast(self, transaction, synchronous=False, strict=True, debug=False):
+    def _broadcast(self, transaction, synchronous=False, strict=True, mock=False):
         """Processes the transaction for broadcasting into the blockchain.
 
         Parameters
@@ -288,7 +295,7 @@ class Nektar:
             broadcasting     method (Default is False)
         strict : bool, optional
             flag to cause exception upon encountering an error (Default is True)
-        debug : bool, optional
+        mock : bool, optional
             flag to disable completion of the broadcast operation (Default is False)
 
         Returns
@@ -298,10 +305,10 @@ class Nektar:
         method = "condenser_api.broadcast_transaction"
         if synchronous:
             method = "condenser_api.broadcast_transaction_synchronous"
-            result = self.appbase.broadcast(method, transaction, strict, debug)
+            result = self.appbase.broadcast(method, transaction, strict, mock)
             if result:
                 return result
-        return self.appbase.broadcast(method, transaction, strict, debug)
+        return self.appbase.broadcast(method, transaction, strict, mock)
 
     def custom_json(
         self,
@@ -312,7 +319,7 @@ class Nektar:
         expire=30,
         synchronous=False,
         strict=True,
-        debug=False,
+        mock=False,
     ):
         """Provides a generic way to add higher level protocols.
 
@@ -332,7 +339,7 @@ class Nektar:
             flah to broadcasting method synchronously (Default is False)
         strict : bool, optional
             flag to cause exception upon encountering an error (Default is True)
-        debug : bool, optional
+        mock : bool, optional
             flag to disable completion of the broadcast operation (Default is False)
 
         Returns
@@ -353,8 +360,8 @@ class Nektar:
             role = "custom_json"
         if not check_wifs(self.roles, role):
             raise ValueError(
-                "The `custom_json` operation requires"
-                "one of the following private keys:" + ", ".join(ROLES[role])
+                "The `custom_json` operation requires "
+                "one of the following private keys: " + ", ".join(ROLES[role])
             )
 
         if not isinstance(required_posting_auths, list):
@@ -363,7 +370,7 @@ class Nektar:
             )
         data["required_posting_auths"] = required_posting_auths
 
-        if len(re.findall(r"[^\w\-]+", id_)):
+        if len(RE_SNAKE_CASE.findall(id_)):
             raise ValueError(
                 "Custom JSON id must be a valid string preferrably in lowercase and (snake_case or kebab-case) format."
             )
@@ -374,9 +381,9 @@ class Nektar:
         data["json"] = json.dumps(jdata).replace("'", '\\"')
 
         ref_block_num, ref_block_prefix = self.get_reference_block_data()
-        expire = within_range(expire, 5, 120, 30)
+        within_range(expire, 5, 120)
         expiration = make_expiration(expire)
-        synchronous = is_boolean(synchronous, False)
+        is_boolean(synchronous)
 
         operations = [["custom_json", data]]
         transaction = {
@@ -398,7 +405,7 @@ class Nektar:
         expire=30,
         synchronous=False,
         strict=True,
-        debug=False,
+        mock=False,
     ):
         """Transfers asset from one account to another, precision is auto-adjusted based on the specified asset.
 
@@ -420,7 +427,7 @@ class Nektar:
             flah to broadcasting method synchronously (Default is False)
         strict : bool, optional
             flag to cause exception upon encountering an error (Default is True)
-        debug : bool, optional
+        mock : bool, optional
             flag to disable completion of the broadcast operation (Default is False)
 
         Returns
@@ -442,7 +449,7 @@ class Nektar:
                 raise ValueError(
                     "Transfer to vesting only accepts transfer of HIVE asset only."
                 )
-            operations[0][0] = "transfer_to_" + to
+            operations[0][0] = f"transfer_to_{to}"
 
         data = {}
         data["from"] = self.username
@@ -460,7 +467,7 @@ class Nektar:
         precision = ASSETS[asset]["precision"]
         whole, fraction = str(float(amount)).split(".")
         fraction = fraction.ljust(precision, "0")[:precision]
-        data["amount"] = whole + "." + fraction + " " + asset
+        data["amount"] = f"{whole}.{fraction} {asset}"
 
         if to != "vesting":
             if not isinstance(message, str):
@@ -471,11 +478,11 @@ class Nektar:
         operations[0][1] = data
 
         ref_block_num, ref_block_prefix = self.get_reference_block_data()
-        expire = within_range(expire, 5, 120, 30)
+        within_range(expire, 5, 120)
         expiration = make_expiration(expire)
-        synchronous = is_boolean(synchronous, False)
-        strict = is_boolean(strict, True)
-        debug = is_boolean(debug, False)
+        is_boolean(synchronous)
+        is_boolean(strict)
+        is_boolean(mock)
 
         transaction = {
             "ref_block_num": ref_block_num,
@@ -485,7 +492,7 @@ class Nektar:
             "extensions": [],
         }
 
-        return self._broadcast(transaction, synchronous, strict, debug)
+        return self._broadcast(transaction, synchronous, strict, mock)
 
     def transfer_to_savings(
         self,
@@ -496,7 +503,7 @@ class Nektar:
         expire=30,
         synchronous=False,
         strict=True,
-        debug=False,
+        mock=False,
     ):
         """For time locked savings accounts.
 
@@ -516,7 +523,7 @@ class Nektar:
             flah to broadcasting method synchronously (Default is False)
         strict : bool, optional
             flag to cause exception upon encountering an error (Default is True)
-        debug : bool, optional
+        mock : bool, optional
             flag to disable completion of the broadcast operation (Default is False)
 
         Returns
@@ -533,7 +540,7 @@ class Nektar:
             expire=expire,
             synchronous=synchronous,
             strict=strict,
-            debug=debug,
+            mock=mock,
         )
 
     def transfer_to_vesting(
@@ -543,7 +550,7 @@ class Nektar:
         expire=30,
         synchronous=False,
         strict=True,
-        debug=False,
+        mock=False,
     ):
         """For time locked savings accounts.
 
@@ -561,7 +568,7 @@ class Nektar:
             flah to broadcasting method synchronously (Default is False)
         strict : bool, optional
             flag to cause exception upon encountering an error (Default is True)
-        debug : bool, optional
+        mock : bool, optional
             flag to disable completion of the broadcast operation (Default is False)
 
         Returns
@@ -578,9 +585,8 @@ class Nektar:
             expire=expire,
             synchronous=synchronous,
             strict=strict,
-            debug=debug,
+            mock=mock,
         )
-
 
 class Waggle(Nektar):
     """Methods to interact with the Hive Blockchain.
@@ -678,15 +684,14 @@ class Waggle(Nektar):
             params["query"] = query
 
         # custom limits by nektar, hive api limit: 100
-        custom_limit = within_range(limit, 1, 10000, 100)
-        crawls = custom_limit // 100
-        params["limit"] = custom_limit
+        within_range(limit, 1, 10000)
+        crawls = limit // 100
+        params["limit"] = limit
         if crawls > 0:
             params["limit"] = 100
 
         if isinstance(last, str):
-            match = re.findall(r"\bhive-[\d]{1,6}\b", last)
-            if len(match):
+            if len(RE_COMMUNITY.findall(last)):
                 params["last"] = last
 
         results = []
@@ -695,10 +700,10 @@ class Waggle(Nektar):
             results.extend(result)
             if len(result) < 100:
                 break
-            if len(results) >= custom_limit:
+            if len(results) >= limit:
                 break
             params["last"] = results[-1]["name"]
-        return results[:custom_limit]
+        return results[:limit]
 
     def subscribers(self, community, last=None, limit=100):
         """Gets a list of subscribers for a given community.
@@ -721,20 +726,18 @@ class Waggle(Nektar):
 
         params["community"] = community
         if isinstance(community, str):
-            match = re.findall(r"\bhive-[\d]{1,6}\b", community)
-            if not len(match):
+            if not len(RE_COMMUNITY.findall(community)):
                 raise ValueError(f"Community name '{community}' format is unsupported.")
 
         # custom limits by nektar, hive api limit: 100
-        custom_limit = within_range(limit, 1, 10000, 100)
-        crawls = custom_limit // 100
-        params["limit"] = custom_limit
+        within_range(limit, 1, 10000)
+        crawls = limit // 100
+        params["limit"] = limit
         if crawls > 0:
             params["limit"] = 100
 
         if isinstance(last, str):
-            match = re.findall(r"\bhive-[\d]{1,6}\b", last)
-            if len(match):
+            if len(RE_USERNAME.findall(last)):
                 params["last"] = last
 
         results = []
@@ -743,10 +746,10 @@ class Waggle(Nektar):
             results.extend(result)
             if len(result) < 100:
                 break
-            if len(results) >= custom_limit:
+            if len(results) >= limit:
                 break
             params["last"] = results[-1][0]
-        return results[:custom_limit]
+        return results[:limit]
 
     def accounts(self, start=None, limit=100):
         """Looks up accounts starting with name.
@@ -766,9 +769,9 @@ class Waggle(Nektar):
         params = ["", 1]
 
         # custom limits by nektar, hive api limit: 1000
-        custom_limit = within_range(limit, 1, 10000, 100)
-        crawls = custom_limit // 100
-        params[1] = custom_limit
+        within_range(limit, 1, 10000)
+        crawls = limit // 100
+        params[1] = limit
         if crawls > 0:
             params[1] = 1000
 
@@ -787,11 +790,11 @@ class Waggle(Nektar):
                 results.extend(result)
                 if len(result) < 1000:
                     break
-                if len(results) >= custom_limit:
-                    return results[:custom_limit]
+                if len(results) >= limit:
+                    return results[:limit]
             if not len(start):
                 break
-        return results[:custom_limit]
+        return results[:limit]
 
     def followers(self, account=None, start=None, ignore=False, limit=1000):
         """Looks up accounts starting with name.
@@ -828,9 +831,9 @@ class Waggle(Nektar):
                 params[2] = "ignore"
 
         # custom limits by nektar, hive api limit: 1000
-        custom_limit = within_range(limit, 1, 10000, 100)
-        crawls = custom_limit // 100
-        params[3] = custom_limit
+        within_range(limit, 1, 10000)
+        crawls = limit // 100
+        params[3] = limit
         if crawls > 0:
             params[3] = 1000
 
@@ -841,10 +844,10 @@ class Waggle(Nektar):
                 results.append(item["follower"])
             if len(result) < 1000:
                 break
-            if len(results) >= custom_limit:
+            if len(results) >= limit:
                 break
             params[1] = results[-1]["follower"]
-        return results[:custom_limit]
+        return results[:limit]
 
     def history(self, account=None, start=-1, limit=1000, low=None, high=None):
         """Get a list of account history.
@@ -900,35 +903,26 @@ class Waggle(Nektar):
         dict:
         """
 
-        params = ["", -1, 1000]
-        params[0] = self.username
+        params = [self.username, -1, 1000]
         if isinstance(account, str):
             params[0] = account
         # delegate_vesting_shares_operation
-        operation_id = int("1".ljust(40 + 1, "0"), 2)
+        params.append(int("1".ljust(40 + 1, "0"), 2))
         greater_than(start, 0)
         is_boolean(inward)
-
-        key = "delegator"
-        if not inward:
-            key = "delegatee"
+            
 
         results = {}
-        while True:
+        action = ("delegator", "delegatee")[(not inward)]
+        while params[1] >= -1:
             try:
                 result = self.appbase.condenser().get_account_history(params)
             except:
                 params[1] -= 1000
-                if params[1] < start:
-                    break
                 continue
-            tids = [1000]
             for item in result:
-                tids.append(item[0])
-                if params[1] == -1:
-                    continue
                 delegation = item[1]["op"][1]
-                name = delegation[key]
+                name = delegation[action]
                 if name == self.username:
                     continue
                 if name not in results:
@@ -936,21 +930,18 @@ class Waggle(Nektar):
                 results[name][item[1]["timestamp"]] = float(
                     delegation["vesting_shares"].split(" ")[0]
                 )
-            if params[1] == -1:
-                params[1] = (max(tids) // 1000) * 1000
-                params.append(operation_id)
+            params[1] = ((result[-1][0] // 1000) * 1000)
+
+        if not active:
+            return results
+
+        active_delegations = {}
+        for name, data in results.items():
+            recent = max(data.keys())
+            if not data[recent]:
                 continue
-            params[1] -= 1000
-            if params[1] < start:
-                break
-        if active:
-            active_delegations = {}
-            for d, data in results.items():
-                recent = max(list(data.keys()))
-                if data[recent]:
-                    active_delegations[d] = data[recent]
-            return active_delegations
-        return results
+            active_delegations[name] = data[recent]
+        return active_delegations
 
     def delegators(self, account=None, active=False, start=1000):
         """Get all account delegators and other related information.
@@ -1028,7 +1019,7 @@ class Waggle(Nektar):
         params["observer"] = self.username
 
         # custom limits by nektar, hive api limit: 100?
-        limit = within_range(limit, 1, 1000, 100)
+        within_range(limit, 1, 1000)
         params["limit"] = limit
 
         results = []
@@ -1070,7 +1061,7 @@ class Waggle(Nektar):
         params["observer"] = self.username
 
         # custom limits by nektar, hive api limit: 100?
-        limit = within_range(limit, 1, 100, 100)
+        within_range(limit, 1, 100)
         params["limit"] = limit
 
         results = []
@@ -1103,12 +1094,11 @@ class Waggle(Nektar):
         params = {}
         if not isinstance(author, str):
             raise TypeError("Author must be a string.")
-        pattern = r"[\w][\w\d\.\-]{2,15}"
-        if not len(re.findall(pattern, author)):
+        if not len(RE_USERNAME.findall(author)):
             raise ValueError("author must be a string of length 3 - 16.")
         params["author"] = author
-        pattern = r"[\w][\w\d\-\%]{0,255}"
-        if not len(re.findall(pattern, permlink)):
+
+        if not len(RE_PERMLINK.findall(permlink)):
             raise ValueError("permlink must be a valid url-escaped string.")
         params["permlink"] = permlink
         params["observer"] = self.username
@@ -1143,12 +1133,12 @@ class Waggle(Nektar):
         params = ["", ""]
         if not isinstance(author, str):
             raise TypeError("Author must be a string.")
-        pattern = r"[\w][\w\.\-]{2,15}"
-        if not len(re.findall(pattern, author)):
+
+        if not len(RE_USERNAME.findall(author)):
             raise ValueError("author must be a string of length 3 - 16.")
         params[0] = author
-        pattern = r"[\w][\w\-\%]{0,255}"
-        if not len(re.findall(pattern, permlink)):
+
+        if not len(RE_PERMLINK.findall(permlink)):
             raise ValueError("permlink must be a valid url-escaped string.")
         params[1] = permlink
 
@@ -1172,7 +1162,7 @@ class Waggle(Nektar):
         expire=30,
         synchronous=False,
         strict=True,
-        debug=False,
+        mock=False,
     ):
         """Broadcast a new post to the blockchain
 
@@ -1194,7 +1184,7 @@ class Waggle(Nektar):
             flah to broadcasting method synchronously (Default is False)
         strict : bool, optional
             flag to cause exception upon encountering an error (Default is True)
-        debug : bool, optional
+        mock : bool, optional
             flag to disable completion of the broadcast operation (Default is False)
 
         Returns
@@ -1211,7 +1201,7 @@ class Waggle(Nektar):
         data = {}
         data["author"] = self.username
 
-        title = re.sub(r"[\r\n]", "", title)
+        title = RE_NEWLINES.sub("", title)
         if not (1 <= len(title.encode("utf-8")) <= 256):
             raise ValueError("Title must be within 1 to 256 bytes.")
         data["title"] = title
@@ -1222,7 +1212,7 @@ class Waggle(Nektar):
             raise ValueError("Body must be at least 1 byte.")
         data["body"] = body
 
-        permlink = re.sub(r"[^\w\ ]", "", title.lower())
+        permlink = RE_WORDS.sub("", title.lower())
         permlink = permlink.replace(" ", "-")
         data["permlink"] = permlink
         data["parent_author"] = ""
@@ -1230,7 +1220,7 @@ class Waggle(Nektar):
         ## set parent permlink as empty, or the community being posted to
         data["parent_permlink"] = ""
         if isinstance(community, str):
-            if not len(re.findall(r"hive-[\d]{1,}", community)):
+            if not len(RE_COMMUNITY.findall(community)):
                 raise ValueError("Community name must follow `hive-*` format.")
             data["parent_permlink"] = community
 
@@ -1238,28 +1228,25 @@ class Waggle(Nektar):
         json_metadata = {}
         json_metadata["description"] = ""
         if isinstance(description, str):
-            description = re.sub(r"[\r\n]", "", description)
+            description = RE_NEWLINES.sub("", description)
             json_metadata["description"] = description
         ## make sure tags are valid
         ## accept more than 5, but only looks for the first five
         json_metadata["tags"] = []
         if isinstance(tags, str):
-            json_metadata["tags"] = list(re.sub(r"[^\w\ ]", "", tags).split(" "))
+            json_metadata["tags"] = list(RE_WORDS.sub("", tags).split(" "))
         json_metadata["format"] = "markdown"
-        json_metadata["app"] = self.app + "/" + self.version
-        pattern_images = (
-            r"[!]\[[\w\ \-._~!$&'()*+,;=:@#\/?]*\]\([\w\-._~!$&'()*+,;=:@#\/?]+\)"
-        )
-        json_metadata["image"] = list(re.findall(pattern_images, body))
+        json_metadata["app"] = f"{self.app}/{self.version}"
+        json_metadata["image"] = list(RE_IMAGES.findall(body))
         data["json_metadata"] = json.dumps(json_metadata).replace("'", '\\"')
 
         ## initialize transaction data
         ref_block_num, ref_block_prefix = self.get_reference_block_data()
         expiration = make_expiration(expire)
-        expire = within_range(expire, 5, 120, 30)
-        synchronous = is_boolean(synchronous, False)
-        strict = is_boolean(strict, True)
-        debug = is_boolean(debug, False)
+        within_range(expire, 5, 120)
+        is_boolean(synchronous)
+        is_boolean(strict)
+        is_boolean(mock)
 
         operations = [["comment", data]]
         transaction = {
@@ -1269,7 +1256,7 @@ class Waggle(Nektar):
             "operations": operations,
             "extensions": [],
         }
-        return self._broadcast(transaction, synchronous, strict, debug)
+        return self._broadcast(transaction, synchronous, strict, mock)
 
     def reblog(
         self,
@@ -1278,7 +1265,7 @@ class Waggle(Nektar):
         expire=30,
         synchronous=False,
         strict=True,
-        debug=False,
+        mock=False,
     ):
         """Reblog post.
 
@@ -1294,7 +1281,7 @@ class Waggle(Nektar):
             flah to broadcasting method synchronously (Default is False)
         strict : bool, optional
             flag to cause exception upon encountering an error (Default is True)
-        debug : bool, optional
+        mock : bool, optional
             flag to disable completion of the broadcast operation (Default is False)
 
         Returns
@@ -1318,7 +1305,7 @@ class Waggle(Nektar):
             expire=expire,
             synchronous=synchronous,
             strict=strict,
-            debug=debug,
+            mock=mock,
         )
 
     def reply(
@@ -1330,7 +1317,7 @@ class Waggle(Nektar):
         expire=30,
         synchronous=False,
         strict=True,
-        debug=False,
+        mock=False,
     ):
         """Broadcast a new comment to a post.
 
@@ -1350,7 +1337,7 @@ class Waggle(Nektar):
             flah to broadcasting method synchronously (Default is False)
         strict : bool, optional
             flag to cause exception upon encountering an error (Default is True)
-        debug : bool, optional
+        mock : bool, optional
             flag to disable completion of the broadcast operation (Default is False)
 
         Returns
@@ -1378,29 +1365,26 @@ class Waggle(Nektar):
         data["body"] = body
 
         uid = ""
-        edit = is_boolean(edit, True)
+        is_boolean(edit)
         if not edit:
             uid = make_expiration(formatting="-%Y%m%d%H%M%S")
-        data["permlink"] = ("re-" + permlink + uid)[:255]
+        data["permlink"] = f"re-{permlink}{uid}"[:255]
 
         ## create comment metadata
         json_metadata = {}
         json_metadata["description"] = ""
         json_metadata["format"] = "markdown"
-        json_metadata["app"] = self.app + "/" + self.version
-        pattern_images = (
-            r"[!]\[[\w\ \-._~!$&'()*+,;=:@#\/?]*\]\([\w\-._~!$&'()*+,;=:@#\/?]+\)"
-        )
-        json_metadata["image"] = list(re.findall(pattern_images, body))
+        json_metadata["app"] = f"{self.app}/{self.version}"
+        json_metadata["image"] = list(RE_IMAGES.findall(body))
         data["json_metadata"] = json.dumps(json_metadata).replace("'", '\\"')
 
         ## initialize transaction data
         ref_block_num, ref_block_prefix = self.get_reference_block_data()
         expiration = make_expiration(expire)
-        expire = within_range(expire, 5, 120, 30)
-        synchronous = is_boolean(synchronous, False)
-        strict = is_boolean(strict, True)
-        debug = is_boolean(debug, False)
+        within_range(expire, 5, 120)
+        is_boolean(synchronous)
+        is_boolean(strict)
+        is_boolean(mock)
 
         operations = [["comment", data]]
         transaction = {
@@ -1410,7 +1394,7 @@ class Waggle(Nektar):
             "operations": operations,
             "extensions": [],
         }
-        return self._broadcast(transaction, synchronous, strict, debug)
+        return self._broadcast(transaction, synchronous, strict, mock)
 
     def replies(self, author, permlink, retries=1):
         """Returns a list of replies.
@@ -1432,12 +1416,12 @@ class Waggle(Nektar):
         params = ["", ""]
         if not isinstance(author, str):
             raise TypeError("Author must be a string.")
-        pattern = r"[\w][\w\.\-]{2,15}"
-        if not len(re.findall(pattern, author)):
+
+        if not len(RE_USERNAME.findall(author)):
             raise ValueError("author must be a string of length 3 - 16.")
         params[0] = author
-        pattern = r"[\w][\w\-\%]{0,255}"
-        if not len(re.findall(pattern, permlink)):
+
+        if not len(RE_PERMLINK.findall(permlink)):
             raise ValueError("permlink must be a valid url-escaped string.")
         params[1] = permlink
 
@@ -1471,12 +1455,12 @@ class Waggle(Nektar):
         params = ["", ""]
         if not isinstance(author, str):
             raise TypeError("Author must be a string.")
-        pattern = r"[\w][\w\.\-]{2,15}"
-        if not len(re.findall(pattern, author)):
+
+        if not len(RE_USERNAME.findall(author)):
             raise ValueError("author must be a string of length 3 - 16.")
         params[0] = author
-        pattern = r"[\w][\w\-\%]{0,255}"
-        if not len(re.findall(pattern, permlink)):
+
+        if not len(RE_PERMLINK.findall(permlink)):
             raise ValueError("permlink must be a valid url-escaped string.")
         params[1] = permlink
 
@@ -1500,7 +1484,7 @@ class Waggle(Nektar):
         expire=30,
         synchronous=False,
         strict=True,
-        debug=False,
+        mock=False,
     ):
         """Perform vote on a blog post or comment.
 
@@ -1522,7 +1506,7 @@ class Waggle(Nektar):
             flah to broadcasting method synchronously (Default is False)
         strict : bool, optional
             flag to cause exception upon encountering an error (Default is True)
-        debug : bool, optional
+        mock : bool, optional
             flag to disable completion of the broadcast operation (Default is False)
 
         Returns
@@ -1539,31 +1523,28 @@ class Waggle(Nektar):
         if not isinstance(author, str):
             raise TypeError("Author must be a string.")
 
-        pattern = r"[\w][\w\d\.\-]{2,15}"
-        match = re.findall(pattern, author)
-        if not len(match):
+        if not len(RE_USERNAME.findall(author)):
             raise ValueError("author must be a string of length 3 - 16.")
 
-        pattern = r"[\w][\w\d\-\%]{0,255}"
-        match = re.findall(pattern, permlink)
-        if not len(match):
+        if not len(RE_PERMLINK.findall(permlink)):
             raise ValueError("permlink must be a valid url-escaped string.")
 
-        if is_boolean(check, False):
+        is_boolean(check)
+        if check:
             if self.voted(author, permlink):
                 return {}
 
         if isinstance(percent, (int, float)):
-            percent = within_range(percent, -100, 100)
+            within_range(percent, -100, 100)
             weight = 10000 * (percent / 100)
 
         ref_block_num, ref_block_prefix = self.get_reference_block_data()
-        weight = within_range(weight, -10000, 10000, 10000)
-        expire = within_range(expire, 5, 120, 30)
+        within_range(weight, -10000, 10000)
+        within_range(expire, 5, 120)
         expiration = make_expiration(expire)
-        synchronous = is_boolean(synchronous, False)
-        strict = is_boolean(strict, True)
-        debug = is_boolean(debug, False)
+        is_boolean(synchronous)
+        is_boolean(strict)
+        is_boolean(mock)
 
         operations = [
             [
@@ -1583,7 +1564,7 @@ class Waggle(Nektar):
             "operations": operations,
             "extensions": [],
         }
-        return self._broadcast(transaction, synchronous, strict, debug)
+        return self._broadcast(transaction, synchronous, strict, mock)
 
     def votes(self, author, permlink, retries=1):
         """Returns all votes for the given post.
@@ -1605,12 +1586,12 @@ class Waggle(Nektar):
         params = ["", ""]
         if not isinstance(author, str):
             raise TypeError("Author must be a string.")
-        pattern = r"[\w][\w\.\-]{2,15}"
-        if not len(re.findall(pattern, author)):
+
+        if not len(RE_USERNAME.findall(author)):
             raise ValueError("author must be a string of length 3 - 16.")
         params[0] = author
-        pattern = r"[\w][\w\-\%]{0,255}"
-        if not len(re.findall(pattern, permlink)):
+
+        if not len(RE_PERMLINK.findall(permlink)):
             raise ValueError("permlink must be a valid url-escaped string.")
         params[1] = permlink
 
@@ -1625,7 +1606,7 @@ class Waggle(Nektar):
         return {}
 
     def voted(
-        self, author, permlink, expire=30, synchronous=False, strict=True, debug=False
+        self, author, permlink, expire=30, synchronous=False, strict=True, mock=False
     ):
         """
 
@@ -1641,7 +1622,7 @@ class Waggle(Nektar):
              (Default is False)
         strict : bool, optional
              (Default is True)
-        debug : bool, optional
+        mock : bool, optional
              (Default is False)
 
         Returns
@@ -1660,7 +1641,7 @@ class Waggle(Nektar):
         expire=30,
         synchronous=False,
         strict=True,
-        debug=False,
+        mock=False,
     ):
         """
 
@@ -1676,7 +1657,7 @@ class Waggle(Nektar):
              (Default is False)
         strict : bool, optional
              (Default is True)
-        debug : bool, optional
+        mock : bool, optional
              (Default is False)
 
         Returns
@@ -1690,9 +1671,8 @@ class Waggle(Nektar):
             expire=expire,
             synchronous=synchronous,
             strict=strict,
-            debug=False,
+            mock=mock,
         )
-
 
 class Swarm(Nektar):
     """Methods for admins and moderators to manage communities.
@@ -1743,6 +1723,7 @@ class Swarm(Nektar):
             retries=retries,
             warning=warning,
         )
+        self.roles = []
         self.set_username(username, wifs)
         self.account = None
         self.refresh()
@@ -1768,7 +1749,7 @@ class Swarm(Nektar):
         expire=30,
         synchronous=False,
         strict=True,
-        debug=False,
+        mock=False,
     ):
         """Mute posts or comments with a designated note.
 
@@ -1788,7 +1769,7 @@ class Swarm(Nektar):
             flah to broadcasting method synchronously (Default is False)
         strict : bool, optional
             flag to cause exception upon encountering an error (Default is True)
-        debug : bool, optional
+        mock : bool, optional
             flag to disable completion of the broadcast operation (Default is False)
 
         Returns
@@ -1813,13 +1794,13 @@ class Swarm(Nektar):
 
         return self.custom_json(
             id_="community",
-            json_data=operation,
+            jdata=operation,
             required_auths=[],
             required_posting_auths=[self.username],
             expire=expire,
             synchronous=synchronous,
             strict=strict,
-            debug=debug,
+            mock=mock,
         )
 
     def unmute(
@@ -1830,7 +1811,7 @@ class Swarm(Nektar):
         expire=30,
         synchronous=False,
         strict=True,
-        debug=False,
+        mock=False,
     ):
         """Unmute posts or comments with a designated note.
 
@@ -1848,14 +1829,14 @@ class Swarm(Nektar):
             flah to broadcasting method synchronously (Default is False)
         strict : bool, optional
             flag to cause exception upon encountering an error (Default is True)
-        debug : bool, optional
+        mock : bool, optional
             flag to disable completion of the broadcast operation (Default is False)
 
         Returns
         -------
 
         """
-        return self.mute(author, permlink, notes, False, expire, strict, debug)
+        return self.mute(author, permlink, notes, False, expire, strict, mock)
 
     def mark_spam(
         self,
@@ -1864,7 +1845,7 @@ class Swarm(Nektar):
         expire=30,
         synchronous=False,
         strict=True,
-        debug=False,
+        mock=False,
     ):
         """Muting post but noted as `spam` as standardized label for spams.
 
@@ -1880,14 +1861,14 @@ class Swarm(Nektar):
             flah to broadcasting method synchronously (Default is False)
         strict : bool, optional
             flag to cause exception upon encountering an error (Default is True)
-        debug : bool, optional
+        mock : bool, optional
             flag to disable completion of the broadcast operation (Default is False)
 
         Returns
         -------
 
         """
-        self.mute(author, permlink, "spam", True, expire, strict, debug)
+        self.mute(author, permlink, "spam", True, expire, strict, mock)
 
     def update(
         self,
@@ -1899,7 +1880,7 @@ class Swarm(Nektar):
         expire=30,
         synchronous=False,
         strict=True,
-        debug=False,
+        mock=False,
     ):
         """Update community properties.
 
@@ -1921,7 +1902,7 @@ class Swarm(Nektar):
             flah to broadcasting method synchronously (Default is False)
         strict : bool, optional
             flag to cause exception upon encountering an error (Default is True)
-        debug : bool, optional
+        mock : bool, optional
             flag to disable completion of the broadcast operation (Default is False)
 
         Returns
@@ -1929,11 +1910,11 @@ class Swarm(Nektar):
 
         """
 
-        title = re.sub(r"[\r\n]", "", title)
+        title = RE_NEWLINES.sub("", title)
         if not (1 <= len(title.encode("utf-8")) <= 20):
             raise ValueError("`title` parameter must be a string of length 1 to 20.")
 
-        about = re.sub(r"[\r\n]", "", about)
+        about = RE_NEWLINES.sub("", about)
         if not (0 <= len(about.encode("utf-8")) <= 120):
             raise ValueError("`about` parameter must be a string of length 0 to 120.")
 
@@ -1969,13 +1950,13 @@ class Swarm(Nektar):
 
         return self.custom_json(
             id_="community",
-            json_data=operation,
+            jdata=operation,
             required_auths=[],
             required_posting_auths=[self.username],
             expire=expire,
             synchronous=synchronous,
             strict=strict,
-            debug=debug,
+            mock=mock,
         )
 
     def subscribe(
@@ -1984,7 +1965,7 @@ class Swarm(Nektar):
         expire=30,
         synchronous=False,
         strict=True,
-        debug=False,
+        mock=False,
     ):
         """Subscribe to the community.
 
@@ -1998,7 +1979,7 @@ class Swarm(Nektar):
             flah to broadcasting method synchronously (Default is False)
         strict : bool, optional
             flag to cause exception upon encountering an error (Default is True)
-        debug : bool, optional
+        mock : bool, optional
             flag to disable completion of the broadcast operation (Default is False)
 
         Returns
@@ -2013,16 +1994,16 @@ class Swarm(Nektar):
 
         return self.custom_json(
             id_="community",
-            json_data=operation,
+            jdata=operation,
             required_auths=[],
             required_posting_auths=[self.username],
             expire=expire,
             synchronous=synchronous,
             strict=strict,
-            debug=debug,
+            mock=mock,
         )
 
-    def unsubscribe(self, expire=30, synchronous=False, strict=True, debug=False):
+    def unsubscribe(self, expire=30, synchronous=False, strict=True, mock=False):
         """Unsubscribe to the community.
 
         Parameters
@@ -2033,7 +2014,7 @@ class Swarm(Nektar):
             flah to broadcasting method synchronously (Default is False)
         strict : bool, optional
             flag to cause exception upon encountering an error (Default is True)
-        debug : bool, optional
+        mock : bool, optional
             flag to disable completion of the broadcast operation (Default is False)
 
         Returns
@@ -2041,7 +2022,7 @@ class Swarm(Nektar):
 
         """
 
-        return self.subscribe(False, expire, synchronous, strict, debug)
+        return self.subscribe(False, expire, synchronous, strict, mock)
 
     def pin(
         self,
@@ -2051,7 +2032,7 @@ class Swarm(Nektar):
         expire=30,
         synchronous=False,
         strict=True,
-        debug=False,
+        mock=False,
     ):
         """Pin post to the top of the community homepage.
 
@@ -2067,7 +2048,7 @@ class Swarm(Nektar):
             flah to broadcasting method synchronously (Default is False)
         strict : bool, optional
             flag to cause exception upon encountering an error (Default is True)
-        debug : bool, optional
+        mock : bool, optional
             flag to disable completion of the broadcast operation (Default is False)
         pin :
              (Default is True)
@@ -2092,13 +2073,13 @@ class Swarm(Nektar):
 
         return self.custom_json(
             id_="community",
-            json_data=operation,
+            jdata=operation,
             required_auths=[],
             required_posting_auths=[self.username],
             expire=expire,
             synchronous=synchronous,
             strict=strict,
-            debug=debug,
+            mock=mock,
         )
 
     def unpin(
@@ -2108,7 +2089,7 @@ class Swarm(Nektar):
         expire=30,
         synchronous=False,
         strict=True,
-        debug=False,
+        mock=False,
     ):
         """Unpin post from the top of the community homepage.
 
@@ -2124,7 +2105,7 @@ class Swarm(Nektar):
             flah to broadcasting method synchronously (Default is False)
         strict : bool, optional
             flag to cause exception upon encountering an error (Default is True)
-        debug : bool, optional
+        mock : bool, optional
             flag to disable completion of the broadcast operation (Default is False)
 
         Returns
@@ -2132,7 +2113,7 @@ class Swarm(Nektar):
 
         """
 
-        self.pin(author, permlink, False, expire, synchronous, strict, debug)
+        self.pin(author, permlink, False, expire, synchronous, strict, mock)
 
     def flag(
         self,
@@ -2142,7 +2123,7 @@ class Swarm(Nektar):
         expire=30,
         synchronous=False,
         strict=True,
-        debug=False,
+        mock=False,
     ):
         """It’s up to the community to define what constitutes flagging.
 
@@ -2160,7 +2141,7 @@ class Swarm(Nektar):
             flah to broadcasting method synchronously (Default is False)
         strict : bool, optional
             flag to cause exception upon encountering an error (Default is True)
-        debug : bool, optional
+        mock : bool, optional
             flag to disable completion of the broadcast operation (Default is False)
 
         Returns
@@ -2181,11 +2162,11 @@ class Swarm(Nektar):
 
         return self.custom_json(
             id_="community",
-            json_data=operation,
+            jdata=operation,
             required_auths=[],
             required_posting_auths=[self.username],
             expire=expire,
             synchronous=synchronous,
             strict=strict,
-            debug=debug,
+            mock=mock,
         )

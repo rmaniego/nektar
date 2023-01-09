@@ -7,13 +7,12 @@
     :license: MIT License
 """
 
-import re
+
 import time
+from re import findall
 from datetime import datetime, timezone
-from .constants import (
-    ROLES,
-    DATETIME_FORMAT
-)
+from .constants import ROLES, DATETIME_FORMAT
+
 
 class NektarException(Exception):
     """ """
@@ -38,6 +37,7 @@ def check_wifs(roles, operation):
     """
     return bool(len([r for r in ROLES[operation] if r in roles]))
 
+
 def make_expiration(seconds=30, formatting=None):
     """Return a UTC datetime formatted for the blockchain.
 
@@ -58,6 +58,7 @@ def make_expiration(seconds=30, formatting=None):
         formatting = DATETIME_FORMAT
     valid_string(formatting)
     return datetime.utcfromtimestamp(timestamp).strftime(formatting)
+
 
 def valid_string(value, pattern=None, fallback=None):
     """Check if the value is a valid string.
@@ -82,11 +83,12 @@ def valid_string(value, pattern=None, fallback=None):
         return fallback
     if pattern is None:
         return value
-    if not bool(len(re.findall(pattern, value))):
+    if not bool(len(pattern.findall(value))):
         raise NektarException("The value is unsupported.")
     return value
 
-def greater_than(value, minimum, fallback=None):
+
+def greater_than(value, minimum):
     """Check if input is greater than, otherwise return fallback.
 
     Parameters
@@ -95,22 +97,17 @@ def greater_than(value, minimum, fallback=None):
         value to be tested
     minimum :
         value to be tested against
-    fallback :
-        Default is None
 
     Returns
     -------
         The value or the fallback.
 
     """
-    if not (isinstance(value, int) or rid > minimum):
-        if fallback is None:
-            raise NektarException(f"Value must be an integer greater than {minimum}.")
-        return fallback
-    return value
+    if not (isinstance(value, int) or value > minimum):
+        raise ValueError(f"Value must be an integer greater than {minimum}.")
 
 
-def within_range(value, minimum, maximum, fallback=None):
+def within_range(value, minimum, maximum):
     """Check if input is within the range, otherwise return fallback.
 
     Parameters
@@ -121,28 +118,22 @@ def within_range(value, minimum, maximum, fallback=None):
         minimum value of the range
     maximum :
         maximum value of the range
-    fallback : integer, None
-        fallback value
 
     Returns
     -------
 
     """
     if not (isinstance(value, int) and (minimum <= int(value) <= maximum)):
-        if fallback is None:
-            raise NektarException(f"Value must be within {minimum} to {maximum} only.")
-        return fallback
-    return value
+        raise ValueError(f"Value must be within {minimum} to {maximum} only.")
 
-def is_boolean(value, fallback=None):
+
+def is_boolean(value):
     """Check if input is boolean, otherwise return fallback.
 
     Parameters
     ----------
     value :
         value to be tested
-    fallback : bool, None
-        fallback value
 
     Returns
     -------
@@ -150,7 +141,4 @@ def is_boolean(value, fallback=None):
 
     """
     if not isinstance(value, bool):
-        if fallback is None:
-            raise NektarException("The value must be `True` or `False` only.")
-        return fallback
-    return value
+        raise TypeError("Value must be `True` or `False` only.")
