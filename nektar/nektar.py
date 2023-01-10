@@ -336,7 +336,7 @@ class Nektar:
         expire : int, optional
             transaction expiration in seconds (Default is 30)
         synchronous : bool, optional
-            flah to broadcasting method synchronously (Default is False)
+            flag to broadcasting method synchronously (Default is False)
         strict : bool, optional
             flag to cause exception upon encountering an error (Default is True)
         mock : bool, optional
@@ -424,7 +424,7 @@ class Nektar:
         expire : int, optional
             transaction expiration in seconds (Default is 30)
         synchronous : bool, optional
-            flah to broadcasting method synchronously (Default is False)
+            flag to broadcasting method synchronously (Default is False)
         strict : bool, optional
             flag to cause exception upon encountering an error (Default is True)
         mock : bool, optional
@@ -520,7 +520,7 @@ class Nektar:
         expire : int, optional
             transaction expiration in seconds (Default is 30)
         synchronous : bool, optional
-            flah to broadcasting method synchronously (Default is False)
+            flag to broadcasting method synchronously (Default is False)
         strict : bool, optional
             flag to cause exception upon encountering an error (Default is True)
         mock : bool, optional
@@ -565,7 +565,7 @@ class Nektar:
         expire : int, optional
             transaction expiration in seconds (Default is 30)
         synchronous : bool, optional
-            flah to broadcasting method synchronously (Default is False)
+            flag to broadcasting method synchronously (Default is False)
         strict : bool, optional
             flag to cause exception upon encountering an error (Default is True)
         mock : bool, optional
@@ -848,6 +848,98 @@ class Waggle(Nektar):
                 break
             params[1] = results[-1]["follower"]
         return results[:limit]
+
+    def follow(
+        self,
+        account,
+        unfollow=False,
+        expire=30,
+        synchronous=False,
+        strict=True,
+        mock=False,
+    ):
+        """Reblog post.
+
+        Parameters
+        ----------
+        account :
+            a valid username to follow
+        unfollow : bool, optional
+            flag to unfollow account (Default is False)
+        expire : int, optional
+            transaction expiration in seconds (Default is 30)
+        synchronous : bool, optional
+            flag to broadcasting method synchronously (Default is False)
+        strict : bool, optional
+            flag to cause exception upon encountering an error (Default is True)
+        mock : bool, optional
+            flag to disable completion of the broadcast operation (Default is False)
+
+        Returns
+        -------
+
+        """
+
+        if not check_wifs(self.roles, "follow"):
+            raise ValueError(
+                "The `follow` operation requires"
+                "one of the following private keys:" + ", ".join(ROLES["follow"])
+            )
+
+        what = ["blog"]
+        if unfollow:
+            what.clear()
+
+        jdata = [
+            "follow",
+            {"follower": self.username, "following": account, "what": what},
+        ]
+        return self.custom_json(
+            "follow",
+            jdata,
+            required_posting_auths=[self.username],
+            expire=expire,
+            synchronous=synchronous,
+            strict=strict,
+            mock=mock,
+        )
+    
+    def unfollow(
+        self,
+        account,
+        expire=30,
+        synchronous=False,
+        strict=True,
+        mock=False,
+    ):
+        """Reblog post.
+
+        Parameters
+        ----------
+        account :
+            a valid username to follow
+        expire : int, optional
+            transaction expiration in seconds (Default is 30)
+        synchronous : bool, optional
+            flag to broadcasting method synchronously (Default is False)
+        strict : bool, optional
+            flag to cause exception upon encountering an error (Default is True)
+        mock : bool, optional
+            flag to disable completion of the broadcast operation (Default is False)
+
+        Returns
+        -------
+
+        """
+        
+        return self.follow(
+            account=account,
+            unfollow=True,
+            expire=expire,
+            synchronous=synchronous,
+            strict=strict,
+            mock=mock,
+        )
 
     def history(self, account=None, start=-1, limit=1000, low=None, high=None):
         """Get a list of account history.
@@ -1181,7 +1273,7 @@ class Waggle(Nektar):
         expire : int, optional
             transaction expiration in seconds (Default is 30)
         synchronous : bool, optional
-            flah to broadcasting method synchronously (Default is False)
+            flag to broadcasting method synchronously (Default is False)
         strict : bool, optional
             flag to cause exception upon encountering an error (Default is True)
         mock : bool, optional
@@ -1272,13 +1364,13 @@ class Waggle(Nektar):
         Parameters
         ----------
         author :
-            username of author of the blog post  to reblog
+            username of author of the blog post to reblog
         permlink :
             permlink to the blog post to reblog
         expire : int, optional
             transaction expiration in seconds (Default is 30)
         synchronous : bool, optional
-            flah to broadcasting method synchronously (Default is False)
+            flag to broadcasting method synchronously (Default is False)
         strict : bool, optional
             flag to cause exception upon encountering an error (Default is True)
         mock : bool, optional
@@ -1334,7 +1426,7 @@ class Waggle(Nektar):
         expire : int, optional
             transaction expiration in seconds (Default is 30)
         synchronous : bool, optional
-            flah to broadcasting method synchronously (Default is False)
+            flag to broadcasting method synchronously (Default is False)
         strict : bool, optional
             flag to cause exception upon encountering an error (Default is True)
         mock : bool, optional
@@ -1503,7 +1595,7 @@ class Waggle(Nektar):
         expire : int, optional
             transaction expiration in seconds (Default is 30)
         synchronous : bool, optional
-            flah to broadcasting method synchronously (Default is False)
+            flag to broadcasting method synchronously (Default is False)
         strict : bool, optional
             flag to cause exception upon encountering an error (Default is True)
         mock : bool, optional
@@ -1766,7 +1858,7 @@ class Swarm(Nektar):
         expire : int, optional
             transaction expiration in seconds (Default is 30)
         synchronous : bool, optional
-            flah to broadcasting method synchronously (Default is False)
+            flag to broadcasting method synchronously (Default is False)
         strict : bool, optional
             flag to cause exception upon encountering an error (Default is True)
         mock : bool, optional
@@ -1826,7 +1918,7 @@ class Swarm(Nektar):
         expire : int, optional
             transaction expiration in seconds (Default is 30)
         synchronous : bool, optional
-            flah to broadcasting method synchronously (Default is False)
+            flag to broadcasting method synchronously (Default is False)
         strict : bool, optional
             flag to cause exception upon encountering an error (Default is True)
         mock : bool, optional
@@ -1858,7 +1950,7 @@ class Swarm(Nektar):
         expire : int, optional
             transaction expiration in seconds (Default is 30)
         synchronous : bool, optional
-            flah to broadcasting method synchronously (Default is False)
+            flag to broadcasting method synchronously (Default is False)
         strict : bool, optional
             flag to cause exception upon encountering an error (Default is True)
         mock : bool, optional
@@ -1899,7 +1991,7 @@ class Swarm(Nektar):
         expire : int, optional
             transaction expiration in seconds (Default is 30)
         synchronous : bool, optional
-            flah to broadcasting method synchronously (Default is False)
+            flag to broadcasting method synchronously (Default is False)
         strict : bool, optional
             flag to cause exception upon encountering an error (Default is True)
         mock : bool, optional
@@ -1976,7 +2068,7 @@ class Swarm(Nektar):
         expire : int, optional
             transaction expiration in seconds (Default is 30)
         synchronous : bool, optional
-            flah to broadcasting method synchronously (Default is False)
+            flag to broadcasting method synchronously (Default is False)
         strict : bool, optional
             flag to cause exception upon encountering an error (Default is True)
         mock : bool, optional
@@ -2011,7 +2103,7 @@ class Swarm(Nektar):
         expire : int, optional
             transaction expiration in seconds (Default is 30)
         synchronous : bool, optional
-            flah to broadcasting method synchronously (Default is False)
+            flag to broadcasting method synchronously (Default is False)
         strict : bool, optional
             flag to cause exception upon encountering an error (Default is True)
         mock : bool, optional
@@ -2045,7 +2137,7 @@ class Swarm(Nektar):
         expire : int, optional
             transaction expiration in seconds (Default is 30)
         synchronous : bool, optional
-            flah to broadcasting method synchronously (Default is False)
+            flag to broadcasting method synchronously (Default is False)
         strict : bool, optional
             flag to cause exception upon encountering an error (Default is True)
         mock : bool, optional
@@ -2102,7 +2194,7 @@ class Swarm(Nektar):
         expire : int, optional
             transaction expiration in seconds (Default is 30)
         synchronous : bool, optional
-            flah to broadcasting method synchronously (Default is False)
+            flag to broadcasting method synchronously (Default is False)
         strict : bool, optional
             flag to cause exception upon encountering an error (Default is True)
         mock : bool, optional
@@ -2138,7 +2230,7 @@ class Swarm(Nektar):
         expire : int, optional
             transaction expiration in seconds (Default is 30)
         synchronous : bool, optional
-            flah to broadcasting method synchronously (Default is False)
+            flag to broadcasting method synchronously (Default is False)
         strict : bool, optional
             flag to cause exception upon encountering an error (Default is True)
         mock : bool, optional

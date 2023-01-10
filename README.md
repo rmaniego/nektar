@@ -314,6 +314,16 @@ followers = hive.followers(account="valid-username")
 print(followers)
 ```
 
+**Follow or Unfollow an Account**
+```python
+account = "valid-username"
+hive.follow(account)
+
+# options to unfollow
+hive.follow(account, unfollow=True)
+hive.unfollow(account)
+```
+
 **Get List of Account History** 
 ```python
     
