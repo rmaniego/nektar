@@ -28,6 +28,7 @@ from .constants import (
     RE_PERMLINK,
     RE_WORDS,
     RE_IMAGES,
+    RE_NUMERIC,
 )
 from .utils import (
     check_wifs,
@@ -1009,7 +1010,12 @@ class Waggle(Nektar):
         while params[1] >= -1:
             try:
                 result = self.appbase.condenser().get_account_history(params)
-            except:
+            except Exception as e:
+                i = str(e).find("start=")
+                offset = str(e)[i+6:-1]
+                if not RE_NUMERIC.sub("", offset):
+                    params[1] = int(offset)
+                    continue
                 params[1] -= 1000
                 continue
             for item in result:
@@ -1023,6 +1029,8 @@ class Waggle(Nektar):
                     delegation["vesting_shares"].split(" ")[0]
                 )
             params[1] = ((result[-1][0] // 1000) * 1000)
+            if params[1] <= start:
+                break
 
         if not active:
             return results
