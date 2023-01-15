@@ -39,6 +39,7 @@ from .utils import (
     is_boolean,
 )
 
+
 class Nektar:
     """Nektar base class.
     ~~~~~~~~~
@@ -59,6 +60,8 @@ class Nektar:
         times the request retries if errors are encountered (Default is 3)
     warning :
         display warning messages (Default is False)
+    refresh :
+        lazy mode refresh account data (Default is False)
 
     Returns
     -------
@@ -76,6 +79,7 @@ class Nektar:
         timeout=10,
         retries=3,
         warning=False,
+        refresh=False,
     ):
         self.appbase = AppBase(
             nodes=nodes,
@@ -88,9 +92,10 @@ class Nektar:
         self.set_username(username, wifs)
 
         self.account = None
-        self.refresh()
 
         # lazy mode
+        if bool(refresh) and isinstance(refresh, bool):
+            self.refresh()
         self.config = None
 
     ##################################################
@@ -195,6 +200,8 @@ class Nektar:
         -------
 
         """
+        if self.account is None:
+            self.refresh()
         value = int(self.account["reputation"])
         if account:
             data = self.appbase.condenser().get_accounts([[account]])
@@ -283,7 +290,9 @@ class Nektar:
         -------
 
         """
-        return self.appbase.condenser().verify_authority(transaction, strict=False, mock=mock)
+        return self.appbase.condenser().verify_authority(
+            transaction, strict=False, mock=mock
+        )
 
     def _broadcast(self, transaction, synchronous=False, strict=True, mock=False):
         """Processes the transaction for broadcasting into the blockchain.
@@ -589,6 +598,7 @@ class Nektar:
             mock=mock,
         )
 
+
 class Waggle(Nektar):
     """Methods to interact with the Hive Blockchain.
     ~~~~~~~~~
@@ -613,6 +623,8 @@ class Waggle(Nektar):
         times the request retries if errors are encountered (Default is 3)
     warning :
         display warning messages (Default is False)
+    refresh :
+        lazy mode refresh account data (Default is False)
 
     Returns
     -------
@@ -630,6 +642,7 @@ class Waggle(Nektar):
         timeout=10,
         retries=3,
         warning=False,
+        refresh=False,
     ):
         self.appbase = AppBase(
             nodes=nodes,
@@ -641,7 +654,6 @@ class Waggle(Nektar):
         self.set_username(username, wifs)
 
         self.account = None
-        self.refresh()
 
         self.app = "nektar.waggle"
         if isinstance(app, str):
@@ -652,6 +664,8 @@ class Waggle(Nektar):
             self.version = version
 
         # lazy mode
+        if bool(refresh) and isinstance(refresh, bool):
+            self.refresh()
         self.config = None
 
         # most recent transactions
@@ -904,7 +918,7 @@ class Waggle(Nektar):
             strict=strict,
             mock=mock,
         )
-    
+
     def unfollow(
         self,
         account,
@@ -932,7 +946,7 @@ class Waggle(Nektar):
         -------
 
         """
-        
+
         return self.follow(
             account=account,
             unfollow=True,
@@ -1003,7 +1017,6 @@ class Waggle(Nektar):
         params.append(int("1".ljust(40 + 1, "0"), 2))
         greater_than(start, 0)
         is_boolean(inward)
-            
 
         results = {}
         action = ("delegator", "delegatee")[(not inward)]
@@ -1012,7 +1025,7 @@ class Waggle(Nektar):
                 result = self.appbase.condenser().get_account_history(params)
             except Exception as e:
                 i = str(e).find("start=")
-                offset = str(e)[i+6:-1]
+                offset = str(e)[i + 6 : -1]
                 if not RE_NUMERIC.sub("", offset):
                     params[1] = int(offset)
                     continue
@@ -1028,7 +1041,7 @@ class Waggle(Nektar):
                 results[name][item[1]["timestamp"]] = float(
                     delegation["vesting_shares"].split(" ")[0]
                 )
-            params[1] = ((result[-1][0] // 1000) * 1000)
+            params[1] = (result[-1][0] // 1000) * 1000
             if params[1] <= start:
                 break
 
@@ -1774,6 +1787,7 @@ class Waggle(Nektar):
             mock=mock,
         )
 
+
 class Swarm(Nektar):
     """Methods for admins and moderators to manage communities.
     ~~~~~~~~~
@@ -1798,8 +1812,10 @@ class Swarm(Nektar):
         seconds before the request is dropped (Default is 10)
     retries : int, optional
         times the request retries if errors are encountered (Default is 3)
-    warning : boo, optional
+    warning : bool, optional
         display warning messages (Default is False)
+    refresh :
+        lazy mode refresh account data (Default is False)
 
     """
 
@@ -1815,6 +1831,7 @@ class Swarm(Nektar):
         timeout=10,
         retries=3,
         warning=False,
+        refresh=False,
     ):
         self.appbase = AppBase(
             nodes=nodes,
@@ -1826,7 +1843,10 @@ class Swarm(Nektar):
         self.roles = []
         self.set_username(username, wifs)
         self.account = None
-        self.refresh()
+
+        # lazy mode
+        if bool(refresh) and isinstance(refresh, bool):
+            self.refresh()
 
         self.app = "nektar.swarm"
         if isinstance(app, str):
