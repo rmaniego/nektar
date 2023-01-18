@@ -1019,10 +1019,11 @@ class Waggle(Nektar):
         is_boolean(inward)
 
         results = {}
+        previous = 0
         action = ("delegator", "delegatee")[(not inward)]
         while params[1] >= -1:
             try:
-                result = self.appbase.condenser().get_account_history(params)
+                history = self.appbase.condenser().get_account_history(params)
             except Exception as e:
                 i = str(e).find("start=")
                 offset = str(e)[i + 6 : -1]
@@ -1031,7 +1032,7 @@ class Waggle(Nektar):
                     continue
                 params[1] -= 1000
                 continue
-            for item in result:
+            for item in history:
                 delegation = item[1]["op"][1]
                 name = delegation[action]
                 if name == self.username:
@@ -1041,9 +1042,12 @@ class Waggle(Nektar):
                 results[name][item[1]["timestamp"]] = float(
                     delegation["vesting_shares"].split(" ")[0]
                 )
-            params[1] = (result[-1][0] // 1000) * 1000
+            params[1] = (history[-1][0] // 1000) * 1000
             if params[1] <= start:
                 break
+            if params[1] == previous:
+                params[1] -= 1
+            previous = params[1]
 
         if not active:
             return results
@@ -1264,6 +1268,64 @@ class Waggle(Nektar):
             if len(data):
                 return data
         return {}
+    
+    def comments(self, account=None, start=-1, limit=10):
+        """Get all comments by the user.
+
+        Parameters
+        ----------
+        account :
+            any valid Hive account username, default = initialized username (Default is None)
+        start :
+            initial starting transaction (Default is 1000)
+        limit :
+            maximum number of transactions to return (Default is 10)
+
+        Returns
+        -------
+        list:
+        """
+
+        params = [self.username, -1, 1000]
+        if isinstance(account, str):
+            params[0] = account
+        # comment operation
+        index = BLOCKCHAIN_OPERATIONS.index("comment")
+        params.append(int("1".ljust(index + 1, "0"), 2))
+        greater_than(start, 0)
+
+        if not (1 <= int(limit) <= 1000):
+            raise ValueError("`limit` must be between 1 to 1000.")
+
+        results = []
+        previous = -1
+        while params[1] >= -1:
+            try:
+                history = self.appbase.condenser().get_account_history(params)
+            except Exception as e:
+                i = str(e).find("start=")
+                offset = str(e)[i + 6 : -1]
+                if not RE_NUMERIC.sub("", offset):
+                    params[1] = int(offset)
+                    continue
+                params[1] -= 1000
+                continue
+            for item in history:
+                comment = item[1]["op"][1]
+                if comment["title"]:
+                    continue
+                if comment["author"] != params[0]:
+                    continue
+                results.append(comment)
+                if len(results) == limit:
+                    return results
+            params[1] = (history[-1][0] // 1000) * 1000
+            if params[1] <= start:
+                break
+            if params[1] == previous:
+                params[1] -= 1
+            previous = params[1]
+        return results
 
     def new_post(
         self,

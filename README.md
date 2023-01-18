@@ -29,7 +29,7 @@ Contains the Waggle, Swarm, and Drone classes.
 
 **Import Module**
 ```python
-from nektar import Waggle
+from nektar import Nektar
 import json
 
 wifs = { "active": "5*" , "posting": "5*"}
@@ -101,7 +101,7 @@ hive.custom_json(
 
 **Import Module**
 ```python
-from nektar import Waggle
+from nektar import Nektar
 import json
 
 wifs = { "active": "5*" , "posting": "5*"}
@@ -411,6 +411,20 @@ for blog in blogs:
         print(key + ":", value)
 ```
 
+**Get Outward Comments** 
+Get comments made by an account/
+
+```python
+comments = hive.comments(limit=20)
+for comment in comments:
+    print(comment["body"])
+
+## comments of another account
+comments = hive.comments(username="valid-username", limit=100)
+for comment in comments:
+    print(json.dumps(comment, indent=2))
+```
+
 **Access a Blog Post/Comment (Bridge API)** 
 If the post or comment does not exists in the blockchain, it will return an empty dictionary.
 
@@ -418,15 +432,15 @@ If the post or comment does not exists in the blockchain, it will return an empt
 
 author = "valid-username"
 permlink = "valid-permlink"
-data = hive.get_post(author, permlink)
-print(json.dumps(data, indent=4))
+content = hive.get_post(author, permlink)
+print(json.dumps(content, indent=4))
     
 author = "valid-username"
 permlink = "test-permlink-abc-123-def-456"
-data = hive.get_post(author, permlink, retries=5)
-if not data:
+content = hive.get_post(author, permlink, retries=5)
+if not content:
     print("The post is not yet in the blockchain.")
-print(json.dumps(data, indent=2))
+print(json.dumps(content, indent=2))
 ```
 
 **Access a Blog Post/Comment (Condenser API)** 
@@ -436,13 +450,13 @@ If the post or comment does not exists in the blockchain, it will return an empt
 
 author = "valid-username"
 permlink = "valid-permlink"
-data = hive.get_post(author, permlink)
-print(json.dumps(data, indent=4))
+content = hive.get_post(author, permlink)
+print(json.dumps(content, indent=4))
     
 author = "valid-username"
 permlink = "test-permlink-abc-123-def-456"
 content = hive.get_content(author, permlink, retries=2)
-if not data:
+if not content:
     print("The post is not yet in the blockchain.")
 print(json.dumps(content, indent=2))
 ```
@@ -577,8 +591,9 @@ hive.power_up("valid-username", 100)
 ## Swarm Class 
 Community Management methods
 ```python
-counter += 1
-## Initialize Swarm class")
+from nektar import Swarm
+
+## Initialize Swarm class
 hive = Swarm("hive-*", "valid-username", wif="5*", role="posting")
 
 ## Initialize Swarm class with dictionary of WIFs
