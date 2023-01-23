@@ -314,6 +314,18 @@ followers = hive.followers(account="valid-username")
 print(followers)
 ```
 
+**Get the Following of an Account** 
+```python
+
+## followers of the initialized account
+following = hive.following()
+print("\n".join(following))
+
+## or using a valid account username
+following = hive.following(account="valid-username")
+print("\n".join(following))
+```
+
 **Follow or Unfollow an Account**
 ```python
 account = "valid-username"

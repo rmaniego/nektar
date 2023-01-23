@@ -812,7 +812,7 @@ class Waggle(Nektar):
         return results[:limit]
 
     def followers(self, account=None, start=None, ignore=False, limit=1000):
-        """Looks up accounts starting with name.
+        """Looks up accounts that follows an account starting with name.
 
         Parameters
         ----------
@@ -831,38 +831,51 @@ class Waggle(Nektar):
         """
 
         params = ["", "", "", 1000]
+        params[0] = (self.username, account)[int(isinstance(account, str))]
+        params[1] = ("", start)[int(isinstance(start, str))]
 
-        params[0] = self.username
-        if isinstance(start, str):
-            params[0] = account
-
-        params[1] = ""
-        if isinstance(start, str):
-            params[1] = start
-
-        params[2] = "blog"
-        if not isinstance(ignore, bool):
-            if ignore:
-                params[2] = "ignore"
+        is_boolean(ignore)
+        params[2] = ("blog", "ignore")[int(ignore)]
 
         # custom limits by nektar, hive api limit: 1000
-        within_range(limit, 1, 10000)
-        crawls = limit // 100
+        within_range(limit, 1, 1000)
         params[3] = limit
-        if crawls > 0:
-            params[3] = 1000
 
-        results = []
-        for _ in range(crawls):
-            result = self.appbase.condenser().get_followers(params)
-            for item in result:
-                results.append(item["follower"])
-            if len(result) < 1000:
-                break
-            if len(results) >= limit:
-                break
-            params[1] = results[-1]["follower"]
-        return results[:limit]
+        result = self.appbase.condenser().get_followers(params)
+        return [i["follower"] for i in result]
+
+    def following(self, account=None, start=None, ignore=False, limit=1000):
+        """Looks up accounts being followed starting with name.
+
+        Parameters
+        ----------
+        account :
+            a valid Hive account username, default = username (Default is None)
+        start :
+            account to start from, paging mechanism (Default is None)
+        ignore :
+            show all muted accounts if True (Default is False)
+        limit :
+            maximum limit of accounts to list (Default is 1000)
+
+        Returns
+        -------
+
+        """
+
+        params = ["", "", "", 1000]
+        params[0] = (self.username, account)[int(isinstance(account, str))]
+        params[1] = ("", start)[int(isinstance(start, str))]
+
+        is_boolean(ignore)
+        params[2] = ("blog", "ignore")[int(ignore)]
+
+        # custom limits by nektar, hive api limit: 1000
+        within_range(limit, 1, 1000)
+        params[3] = limit
+
+        result = self.appbase.condenser().get_following(params)
+        return [i["following"] for i in result]
 
     def follow(
         self,
