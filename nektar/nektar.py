@@ -830,16 +830,13 @@ class Waggle(Nektar):
 
         """
 
-        params = ["", "", "", 1000]
+        params = ["", "", "", limit]
         params[0] = (self.username, account)[int(isinstance(account, str))]
         params[1] = ("", start)[int(isinstance(start, str))]
 
         is_boolean(ignore)
         params[2] = ("blog", "ignore")[int(ignore)]
-
-        # custom limits by nektar, hive api limit: 1000
         within_range(limit, 1, 1000)
-        params[3] = limit
 
         result = self.appbase.condenser().get_followers(params)
         return [i["follower"] for i in result]
@@ -863,16 +860,13 @@ class Waggle(Nektar):
 
         """
 
-        params = ["", "", "", 1000]
+        params = ["", "", "", limit]
         params[0] = (self.username, account)[int(isinstance(account, str))]
         params[1] = ("", start)[int(isinstance(start, str))]
 
         is_boolean(ignore)
         params[2] = ("blog", "ignore")[int(ignore)]
-
-        # custom limits by nektar, hive api limit: 1000
         within_range(limit, 1, 1000)
-        params[3] = limit
 
         result = self.appbase.condenser().get_following(params)
         return [i["following"] for i in result]
