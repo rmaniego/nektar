@@ -644,29 +644,17 @@ class Waggle(Nektar):
         warning=False,
         refresh=False,
     ):
-        self.appbase = AppBase(
-            nodes=nodes,
-            chain_id=chain_id,
-            timeout=timeout,
-            retries=retries,
-            warning=warning,
-        )
-        self.set_username(username, wifs)
-
-        self.account = None
-
-        self.app = "nektar.waggle"
-        if isinstance(app, str):
-            self.app = app
-
-        self.version = NEKTAR_VERSION
-        if isinstance(version, str):
-            self.version = version
-
-        # lazy mode
-        if bool(refresh) and isinstance(refresh, bool):
-            self.refresh()
-        self.config = None
+        super().__init__(
+        username,
+        wifs,
+        nodes,
+        chain_id,
+        app,
+        version,
+        timeout,
+        retries,
+        warning,
+        refresh)
 
         # most recent transactions
         self.transaction = None
@@ -1902,20 +1890,17 @@ class Swarm(Nektar):
         warning=False,
         refresh=False,
     ):
-        self.appbase = AppBase(
-            nodes=nodes,
-            chain_id=chain_id,
-            timeout=timeout,
-            retries=retries,
-            warning=warning,
-        )
-        self.roles = []
-        self.set_username(username, wifs)
-        self.account = None
-
-        # lazy mode
-        if bool(refresh) and isinstance(refresh, bool):
-            self.refresh()
+        super().__init__(
+        username,
+        wifs,
+        nodes,
+        chain_id,
+        app,
+        version,
+        timeout,
+        retries,
+        warning,
+        refresh)
 
         self.app = "nektar.swarm"
         if isinstance(app, str):
